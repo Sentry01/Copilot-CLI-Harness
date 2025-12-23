@@ -66,7 +66,14 @@ flowchart LR
 
 ## Quickstart
 
-### 1. Install Prerequisites
+### 1. Clone This Repository
+
+```bash
+git clone https://github.com/Sentry01/Copilot-CLI-Harness.git
+cd Copilot-CLI-Harness
+```
+
+### 2. Install Prerequisites
 
 <details>
 <summary><strong>📦 Install on macOS</strong></summary>
