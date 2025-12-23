@@ -208,6 +208,66 @@ Skills include: `test-driven-development`, `systematic-debugging`, `verification
 
 </details>
 
+<details>
+<summary><strong>🤖 For AI Agents: Automated Setup</strong></summary>
+
+If you're an AI agent setting this up, here's the streamlined process:
+
+**Prerequisites Check (run first):**
+```bash
+# Detect OS and verify tools
+uname -s  # Returns: Darwin (macOS), Linux, or MINGW/CYGWIN (Windows)
+which node && node --version  # Need v22+
+which python3 && python3 --version  # Need 3.10+
+which gh && gh auth status  # Need authenticated GitHub CLI
+which copilot  # Need Copilot CLI installed
+```
+
+**If any prerequisites are missing**, follow the platform-specific instructions above.
+
+**One-shot setup (after prerequisites installed):**
+```bash
+# Clone and configure (assumes gh and copilot already authenticated)
+git clone https://github.com/Sentry01/Copilot-CLI-Harness.git
+cd Copilot-CLI-Harness
+
+# Install MCP config and skills
+mkdir -p ~/.copilot/skills
+cp .copilot/mcp-config.json ~/.copilot/mcp-config.json
+cp -r .copilot/skills/* ~/.copilot/skills/
+cp .copilot/copilot-instructions.md ~/.copilot/copilot-instructions.md
+
+# Install Playwright browser
+npx playwright install chromium
+
+# Verify setup
+./check_prerequisites.sh
+```
+
+**Run the harness:**
+```bash
+python autonomous_agent_demo.py --project-dir my_app --external-monitor &
+```
+
+**Key files:**
+- `prompts/app_spec.txt` — Your application specification (XML format). **Modify this for each project.**
+- `prompts/coding_prompt.md` — Prompt template for coding sessions. *Reference only; don't modify on first run.*
+- `prompts/initializer_prompt.md` — Prompt template for initialization. *Reference only; don't modify on first run.*
+
+**Recommended workflow for AI agents:**
+1. **Ask the user** what application they want to build
+2. **Backup the template**: `cp prompts/app_spec.txt prompts/app_spec.template.txt`
+3. **Generate a new `app_spec.txt`** based on user's description (follow the XML format in the template)
+4. **Run the harness** with the customized spec
+5. For future projects, copy from `app_spec.template.txt` and modify
+
+**Success indicators:**
+- `./check_prerequisites.sh` exits with code 0
+- `$HOME/Projects/my_app/.harness/progress.json` exists after first session
+- GitHub issue created in new repository (check `gh issue list`)
+
+</details>
+
 **Verify everything works:**
 ```bash
 ./check_prerequisites.sh
