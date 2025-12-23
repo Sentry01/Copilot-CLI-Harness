@@ -213,7 +213,7 @@ Skills include: `test-driven-development`, `systematic-debugging`, `verification
 ./check_prerequisites.sh
 ```
 
-### 2. Define Your App
+### 3. Define Your App
 
 Edit `prompts/app_spec.txt` to describe what you want to build:
 
@@ -230,7 +230,7 @@ Edit `prompts/app_spec.txt` to describe what you want to build:
 
 Or include `prompts/app_spec.txt` as context file together with a copilot prompt as a template for an application you want to create.
 
-### 3. Run the Harness
+### 4. Run the Harness
 
 ```bash
 # Run with external monitor window (recommended)
@@ -240,7 +240,7 @@ python autonomous_agent_demo.py --project-dir my_app --external-monitor &
 python autonomous_agent_demo.py --project-dir my_app
 ```
 
-### 4. Watch It Build
+### 5. Watch It Build
 
 The harness creates a `my_app` directory in `$HOME/Projects/`:
 ```
