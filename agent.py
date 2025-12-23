@@ -19,7 +19,6 @@ from copilot_client import CopilotCLIClient, create_client
 from progress import count_passing_tests
 from prompts import get_initializer_prompt, get_coding_prompt, copy_spec_to_project
 from monitor import ProgressMonitor, get_monitor
-from auto_reflect import SessionTracker
 
 
 # Configuration
@@ -172,7 +171,6 @@ async def run_autonomous_agent(
     # Main loop
     iteration = 0
     consecutive_errors = 0  # Track consecutive errors for improvement loop
-    session_tracker = SessionTracker()  # Track metrics for auto-reflection
 
     while True:
         iteration += 1
@@ -228,16 +226,13 @@ PRIORITY: Fix the blocking issues before continuing with new features.
             
         elif status == "continue":
             consecutive_errors = 0  # Reset error counter on success
-            session_tracker.record_success()  # Track for auto-reflection
             print(f"\nAgent will auto-continue in {AUTO_CONTINUE_DELAY_SECONDS}s...")
             await asyncio.sleep(AUTO_CONTINUE_DELAY_SECONDS)
 
         elif status == "error":
             consecutive_errors += 1
-            session_tracker.record_error(response[:100] if response else "Unknown error")  # Track for auto-reflection
             if consecutive_errors >= MAX_ERROR_RETRIES:
                 print(f"\n⚠️  {consecutive_errors} consecutive errors - entering recovery mode next session")
-                session_tracker.record_recovery_mode()  # Track for auto-reflection
             else:
                 print(f"\nSession had {error_count} error(s) (attempt {consecutive_errors}/{MAX_ERROR_RETRIES})")
             print("Will retry with a fresh session...")
@@ -247,11 +242,6 @@ PRIORITY: Fix the blocking issues before continuing with new features.
         if max_iterations is None or iteration < max_iterations:
             print("\nPreparing next session...\n")
             await asyncio.sleep(1)
-
-    # Trigger auto-reflection if conditions met
-    reflection_entry = session_tracker.finalize()
-    if reflection_entry:
-        print("   Check .github/Reflection/reflections.md for details")
 
     # Final summary from monitor
     monitor.print_final_summary()
