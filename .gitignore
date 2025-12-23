@@ -1,0 +1,13 @@
+# Agent-generated output directories
+generations/
+
+# Log files
+logs/
+harness_logs/
+/tmp/agent_*.log
+
+node_modules
+.env
+venv
+__pycache__
+.DS_Store
