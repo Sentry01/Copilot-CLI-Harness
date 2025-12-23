@@ -190,10 +190,7 @@ class CopilotCLIClient:
         if self.options.continue_session:
             cmd.append("--continue")
         
-        # Note: MCP config via --additional-mcp-config has format issues
-        # Skip MCP for now - browser automation will need to be handled differently
-        # TODO: Figure out correct Copilot CLI MCP config format
-        
+               
         # Add the prompt
         last_message = self._messages[-1]["content"]
         cmd.extend(["-p", last_message])
@@ -327,7 +324,7 @@ def create_client(project_dir: Path, model: str) -> CopilotCLIClient:
     }
     
     # Write MCP config to .harness/
-    mcp_config_path = harness_dir / "MCP.json"
+    mcp_config_path = harness_dir / "mcp.json"
     with open(mcp_config_path, "w") as f:
         json.dump({"mcpServers": mcp_config}, f, indent=2)
     

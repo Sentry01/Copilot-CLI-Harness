@@ -1,37 +1,12 @@
 {
   "mcpServers": {
-    "sequentialthinking": {
-      "type": "local",
-      "command": "npx",
-      "args": [
-        "-y",
-        "@modelcontextprotocol/server-sequential-thinking@latest"
-      ],
-      "tools": ["sequentialthinking"]
-    },
-    "markitdown": {
-      "type": "local",
-      "command": "uvx",
-      "args": [
-        "markitdown-mcp==0.0.1a4"
-      ],
-      "tools": ["convert_to_markdown"]
-    },
-    "playwright": {
+      "playwright": {
       "type": "local",
       "command": "npx",
       "args": [
         "@playwright/mcp@latest"
       ],
       "tools": ["browser_navigate", "browser_click", "browser_snapshot", "browser_type", "browser_take_screenshot"]
-    },
-    "octocode": {
-      "type": "local",
-      "command": "npx",
-      "args": [
-        "octocode-mcp@latest"
-      ],
-      "tools": ["githubSearchCode", "githubGetFileContent", "githubViewRepoStructure", "githubSearchRepositories", "githubSearchPullRequests", "packageSearch"]
     }
   }
 }

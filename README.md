@@ -66,14 +66,150 @@ flowchart LR
 
 ## Quickstart
 
-### 1. Prerequisites
-Ensure you have **[GitHub Copilot CLI](https://docs.github.com/en/copilot/how-tos/set-up/install-copilot-cli)**, **Python 3.10+**, and **Node.js 18+** installed. Authentication relies on your existing local sessions of both GitHub and Copilot CLI —**no manual GitHub PATs are required**.
+### 1. Install Prerequisites
+
+<details>
+<summary><strong>📦 Install on macOS</strong></summary>
+
+```bash
+# Install Homebrew (if not installed)
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+# Install Node.js 22+ and Python 3.10+
+brew install node python@3.12
+
+# Install or Update GitHub Copilot CLI
+# See: https://docs.github.com/en/copilot/how-tos/set-up/install-copilot-cli
+brew install copilot-cli
+
+or 
+
+npm install -g @github/copilot
+
+# Authenticate with GitHub (for git operations)
+brew install gh
+gh auth login
+
+# Authenticate with Copilot CLI (opens browser)
+copilot
+# Then type: /login
+
+# Install Playwright browsers (for UI verification)
+npx playwright install chromium
+```
+
+</details>
+
+<details>
+<summary><strong>📦 Install on Windows</strong></summary>
+
+**Requirements:** PowerShell v6+, Node.js 22+
+
+```powershell
+# Install Copilot CLI via WinGet
+# See: https://docs.github.com/en/copilot/using-github-copilot/using-github-copilot-in-the-command-line
+winget install GitHub.Copilot
+
+# Install Node.js from https://nodejs.org (v22+)
+# Install Python from https://python.org (v3.10+)
+
+# Authenticate with GitHub (for git operations)
+winget install GitHub.cli
+gh auth login
+
+# Authenticate with Copilot CLI
+copilot
+# Then type: /login
+
+# Install Playwright browsers
+npx playwright install chromium
+```
+
+</details>
+
+<details>
+<summary><strong>📦 Install on Linux</strong></summary>
+
+```bash
+# See: https://docs.github.com/en/copilot/using-github-copilot/using-github-copilot-in-the-command-line
+
+# Option 1: Install via Homebrew
+brew install copilot-cli
+
+# Option 2: Install via npm (requires Node.js 22+)
+npm install -g @github/copilot
+
+# Option 3: Install via script
+curl -fsSL https://gh.io/copilot-install | bash
+
+# Install Python if not present
+sudo apt install python3 python3-pip  # Debian/Ubuntu
+
+# Authenticate with GitHub (for git operations)
+# Install GitHub CLI: https://github.com/cli/cli#installation
+gh auth login
+
+# Authenticate with Copilot CLI
+copilot
+# Then type: /login
+
+# Install Playwright browsers
+npx playwright install chromium
+```
+
+</details>
+
+<details>
+<summary><strong>🔧 Configure Playwright MCP Server (Required)</strong></summary>
+
+The harness uses Playwright MCP (Model Context Protocol) for browser automation. 
+
+**Option 1: Check if you already have Playwright MCP configured**
+```bash
+# Check your existing Copilot CLI MCP config
+cat ~/.copilot/mcp-config.json
+# Look for "playwright" in the mcpServers section
+```
+
+**Option 2: Use the included config file**
+```bash
+# Copy the pre-configured MCP settings from this repo
+mkdir -p ~/.copilot
+cp .copilot/mcp-config.json ~/.copilot/mcp-config.json
+```
+
+The included config sets up: `playwright` (browser automation)
+
+</details>
+
+<details>
+<summary><strong>⚡ Install Skills (Recommended)</strong></summary>
+
+The harness includes reusable "skills" that improve agent behavior:
+
+```bash
+# Copy skills to your global Copilot config
+mkdir -p ~/.copilot/skills
+cp -r .copilot/skills/* ~/.copilot/skills/
+cp .copilot/copilot-instructions.md ~/.copilot/copilot-instructions.md
+
+# Verify installation
+ls ~/.copilot/skills/
+```
+
+Skills include: `test-driven-development`, `systematic-debugging`, `verification-before-completion`, and more.
+
+</details>
+
+**Verify everything works:**
 ```bash
 ./check_prerequisites.sh
 ```
 
 ### 2. Define Your App
-Edit `prompts/app_spec.txt` to describe what you want to build.
+
+Edit `prompts/app_spec.txt` to describe what you want to build:
+
 ```xml
 <project_specification>
   <project_name>My Awesome App</project_name>
@@ -85,18 +221,33 @@ Edit `prompts/app_spec.txt` to describe what you want to build.
 </project_specification>
 ```
 
+Or include `prompts/app_spec.txt` as context file together with a copilot prompt as a template for an application you want to create.
+
 ### 3. Run the Harness
-Start the autonomous loop.
+
 ```bash
-# Run in background with external monitor (Recommended)
+# Run with external monitor window (recommended)
 python autonomous_agent_demo.py --project-dir my_app --external-monitor &
+
+# Or run in foreground for debugging
+python autonomous_agent_demo.py --project-dir my_app
 ```
 
 ### 4. Watch It Build
-The harness will create a `my_app` directory containing:
-*   `app/`: The deployable application code.
-*   `.harness/`: Logs, progress tracking, and specs.
 
+The harness creates a `my_app` directory in `$HOME/Projects/`:
+```
+my_app/
+├── app/           # Deployable application code
+└── .harness/      # Logs, progress tracking, specs
+```
+
+Monitor progress in real-time:
+```bash
+./monitor_agent.sh --project my_app
+```
+
+The harness will also initialise git, upload to github and create an issue and update it as it progresses.
 ---
 
 ## Detailed Architecture
