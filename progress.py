@@ -31,10 +31,18 @@ def count_passing_tests(project_dir: Path) -> tuple[int, int]:
 
     try:
         with open(tests_file, "r") as f:
-            tests = json.load(f)
+            data = json.load(f)
+
+        # Handle both formats: flat array or {"features": [...]}
+        if isinstance(data, dict) and "features" in data:
+            tests = data["features"]
+        elif isinstance(data, list):
+            tests = data
+        else:
+            return 0, 0
 
         total = len(tests)
-        passing = sum(1 for test in tests if test.get("passes", False))
+        passing = sum(1 for test in tests if isinstance(test, dict) and test.get("passes", False))
 
         return passing, total
     except (json.JSONDecodeError, IOError):
@@ -46,32 +54,46 @@ def get_test_stats(project_dir: Path) -> Dict[str, Any]:
     Get detailed statistics about tests in feature_list.json.
     
     Args:
-        project_dir: Directory containing feature_list.json
+        project_dir: Root project directory (looks in .harness/ for feature_list.json)
         
     Returns:
         Dictionary with stats by category and overall
     """
-    tests_file = project_dir / "feature_list.json"
+    # Check .harness/ first (new structure), fall back to root (legacy)
+    harness_dir = project_dir / ".harness"
+    tests_file = harness_dir / "feature_list.json"
+    if not tests_file.exists():
+        tests_file = project_dir / "feature_list.json"  # Legacy fallback
     
     if not tests_file.exists():
         return {"total": 0, "passing": 0, "categories": {}}
     
     try:
         with open(tests_file, "r") as f:
-            tests = json.load(f)
-        
+            data = json.load(f)
+
+        # Handle both formats: flat array or {"features": [...]}
+        if isinstance(data, dict) and "features" in data:
+            tests = data["features"]
+        elif isinstance(data, list):
+            tests = data
+        else:
+            return {"total": 0, "passing": 0, "categories": {}}
+
         # Count by category
         categories: Dict[str, Dict[str, int]] = {}
         for test in tests:
+            if not isinstance(test, dict):
+                continue
             cat = test.get("category", "unknown")
             if cat not in categories:
                 categories[cat] = {"total": 0, "passing": 0}
             categories[cat]["total"] += 1
             if test.get("passes", False):
                 categories[cat]["passing"] += 1
-        
+
         total = len(tests)
-        passing = sum(1 for test in tests if test.get("passes", False))
+        passing = sum(1 for test in tests if isinstance(test, dict) and test.get("passes", False))
         
         return {
             "total": total,
