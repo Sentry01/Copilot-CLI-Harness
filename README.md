@@ -363,6 +363,7 @@ Unlike traditional CI/CD, the harness uses a **checklist-driven** testing approa
 | Flag | Description | Default |
 |------|-------------|---------|
 | `--project-dir` | Where to build the app. Relative paths go to `$HOME/Projects/`. | `./autonomous_demo_project` |
+| `--spec-file` | The specification file for the application. | `app_spec.txt` |
 | `--model` | The AI model to use (e.g., `claude-sonnet-4.5`, `gpt-5`). | `claude-sonnet-4.5` |
 | `--max-iterations` | Stop after N sessions (useful for cost control). | Unlimited |
 | `--external-monitor` | Opens a separate terminal window for clean monitoring. | `False` |
