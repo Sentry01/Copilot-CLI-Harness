@@ -1,33 +1,48 @@
 # CopilotHarness
 
-> **Turn a text specification into a working application — autonomously.**
+> Stop babysitting your AI coding assistant.
 
-CopilotHarness transforms the **GitHub Copilot CLI** from a coding assistant into an autonomous software engineer. It wraps the CLI in a persistent loop that plans, implements, verifies, and iterates until your application is complete.
+**The Problem**: You ask Copilot CLI to build an app. It starts strong, then:
+- 🧠 **Forgets context** mid-project and rewrites files it already created
+- ✅ **Declares "Done!"** when the app is half-built
+- 🔄 **Loses progress** between sessions—every restart is groundhog day
+
+**The Fix**: CopilotHarness wraps Copilot CLI in a persistent loop with memory. It plans, builds, verifies, and iterates until your app actually works.
+
+![Demo: Harness building an app autonomously](assets/demo.gif)
+
+```bash
+# Go from spec to working app
+python autonomous_agent_demo.py --project-dir my_todo_app
+```
 
 ---
 
-## What It Does
-
-Building complex apps with AI often fails because agents "forget" context or skip steps. CopilotHarness solves this by providing **memory** and **structure**.
-
-It takes a plain English description of an app (`app_spec.txt`) and:
-1.  **Plans**: Breaks the spec into a detailed checklist of testable features.
-2.  **Builds**: Implements features one by one, maintaining context across sessions.
-3.  **Verifies**: Checks that each feature works before moving to the next.
-4.  **Persists**: Saves progress so work can pause and resume without data loss.
-
----
-
-## Why Use a Harness?
-
-AI coding agents face a fundamental "Context Amnesia" problem.
+## Before vs After
 
 | Without Harness | With CopilotHarness |
 |-----------------|---------------------|
-| **One-Shot Failure**: Tries to build everything at once and runs out of context. | **Incremental Success**: Builds one feature at a time, fully tested. |
-| **Premature Completion**: Declares "Done!" when code is only half-written. | **Definition of Done**: Only stops when every item on the checklist passes. |
-| **Context Loss**: Each session starts fresh, guessing what happened before. | **Perfect Memory**: Reads `progress.json` to pick up exactly where it left off. |
-| **Untested Code**: Writes code that looks correct but doesn't run. | **Verified Code**: Mandates verification steps before marking tasks complete. |
+| **Session 1**: "Build a todo app" → Creates 3 files, looks promising |  |
+| **Session 2**: "Continue building" → Rewrites everything from scratch |  |
+| **Session 3**: "Why isn't login working?" → "What login? I don't see any auth code" |  |
+| **Result**: Frustrated developer takes over manually | **Result**: 47 features verified, app deployed |
+
+### What actually happens:
+
+```
+# Session 1: Harness initializes
+✓ Created GitHub repo: my_todo_app
+✓ Generated 156 test cases from spec
+✓ Feature 1/156: Project scaffold... VERIFIED
+
+# Session 12: Still grinding
+✓ Feature 89/156: Drag-and-drop reorder... VERIFIED
+→ Progress saved. Resuming from feature 90...
+
+# Session 23: Done
+✓ All 156 features passing
+✓ Updated GitHub issue with completion summary
+```
 
 ---
 
