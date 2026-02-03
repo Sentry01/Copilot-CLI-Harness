@@ -28,7 +28,7 @@ from agent import run_autonomous_agent
 
 
 # Configuration - using Copilot CLI default harness model
-DEFAULT_MODEL = "claude-sonnet-4.5"
+DEFAULT_MODEL = "claude-opus-4.5"
 DEFAULT_PROJECTS_ROOT = Path(os.environ.get("HOME", str(Path.home()))) / "Projects"
 HARNESS_DIR = Path(__file__).parent.resolve()
 HARNESS_LOGS_DIR = HARNESS_DIR / "harness_logs"
