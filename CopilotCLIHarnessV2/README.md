@@ -131,8 +131,11 @@ pip install -e ".[dev]"
 pytest
 ```
 
-See [`docs/MIGRATION.md`](docs/MIGRATION.md) for the full list of what changed from V1
-and why.
+## Documentation
+
+- [`REPORT.md`](REPORT.md) — project report: the V1 review that motivated the
+  rewrite, what V2 is, test status, and how to stand up the standalone repo.
+- [`docs/MIGRATION.md`](docs/MIGRATION.md) — detailed, item-by-item V1 → V2 changelog.
 
 ## License
 
