@@ -1,0 +1,946 @@
+<project_specification>
+  <project_name>Copilot CLI Guide - Interactive Learning Platform</project_name>
+
+  <overview>
+    Build an interactive educational web application that teaches users how to effectively use GitHub Copilot CLI.
+    The application provides step-by-step tutorials, interactive command sandboxes, real examples, and a 
+    comprehensive reference guide. Users can learn concepts progressively, practice commands in simulated 
+    environments, and track their learning progress. The UI should be clean, modern, and developer-focused
+    using Tailwind CSS with excellent code presentation and responsive design.
+  </overview>
+
+  <technology_stack>
+    <frontend>
+      <framework>React with Vite</framework>
+      <styling>Tailwind CSS (via CDN)</styling>
+      <state_management>React hooks and context</state_management>
+      <routing>React Router for navigation</routing>
+      <markdown>React Markdown for content rendering</markdown>
+      <code_highlighting>Prism.js or Highlight.js for syntax highlighting</code_highlighting>
+      <animations>Framer Motion for smooth transitions</animations>
+      <port>Launch on port 5173</port>
+    </frontend>
+    <backend>
+      <runtime>Node.js with Express</runtime>
+      <database>SQLite with better-sqlite3</database>
+      <content>Markdown files for tutorial content</content>
+    </backend>
+    <communication>
+      <api>RESTful endpoints</api>
+      <real_time>WebSocket for live terminal simulation</real_time>
+    </communication>
+  </technology_stack>
+
+  <core_features>
+    <learning_modules>
+      - Progressive learning path from beginner to advanced
+      - Module 1: Getting Started (installation, authentication, first commands)
+      - Module 2: Basic Commands (copilot explain, copilot suggest, copilot commit)
+      - Module 3: Interactive Mode (starting sessions, conversation context)
+      - Module 4: Tool Integration (MCP servers, Playwright, custom tools)
+      - Module 5: Advanced Patterns (autonomous agents, long-running tasks)
+      - Module 6: Security & Best Practices (allowlists, safe commands)
+      - Module 7: Customization (prompts, skills, instructions)
+      - Each module has lessons, exercises, and quizzes
+      - Estimated time display for each lesson
+      - Prerequisites clearly marked
+    </learning_modules>
+
+    <interactive_terminal>
+      - Simulated terminal environment in browser
+      - Pre-configured scenarios for each lesson
+      - Auto-complete suggestions for commands
+      - Syntax highlighting for command output
+      - Error simulation with helpful hints
+      - Command history navigation
+      - Copy command to clipboard button
+      - Reset terminal state option
+      - Side-by-side: tutorial text and terminal
+      - Animated typing effect for demonstrations
+    </interactive_terminal>
+
+    <command_reference>
+      - Searchable command documentation
+      - Full list of Copilot CLI commands
+      - Command syntax with all flags/options
+      - Real-world usage examples for each command
+      - Common patterns and recipes
+      - Copy-to-clipboard for all examples
+      - Related commands suggestions
+      - Version compatibility notes
+      - Filtering by category (chat, git, explain, etc.)
+    </command_reference>
+
+    <code_examples>
+      - Categorized code example library
+      - Examples: shell scripts, automation, CI/CD integration
+      - Syntax-highlighted code blocks
+      - Line-by-line annotations
+      - "Try it" button to load in terminal simulator
+      - Difficulty rating (beginner/intermediate/advanced)
+      - Community-contributed examples (mock)
+      - Filter by language (bash, zsh, powershell)
+      - Download example as file
+    </code_examples>
+
+    <progress_tracking>
+      - User accounts (local storage or optional login)
+      - Track completed lessons and modules
+      - Progress bar for each learning path
+      - Achievement badges for milestones
+      - Quiz scores and history
+      - Bookmarked lessons
+      - Resume where you left off
+      - Learning streak tracking
+      - Certificate of completion (mock)
+    </progress_tracking>
+
+    <search_discovery>
+      - Global search across all content
+      - Search tutorials, commands, examples
+      - Search suggestions as you type
+      - Filter results by content type
+      - Highlighted search matches
+      - Recent searches history
+      - Popular searches display
+      - Command palette (Cmd/Ctrl+K)
+    </search_discovery>
+
+    <quick_reference_cards>
+      - Printable cheat sheets
+      - Common command patterns
+      - Keyboard shortcuts reference
+      - MCP server configuration templates
+      - Troubleshooting decision trees
+      - Export as PDF option
+      - Pin favorite cards to dashboard
+    </quick_reference_cards>
+
+    <community_features>
+      - Discussion comments on lessons (mock UI)
+      - Upvote helpful tips
+      - Share progress on social (mock)
+      - Suggest content improvements
+      - Report issues or errors
+      - Community Q&A section
+    </community_features>
+
+    <settings_preferences>
+      - Theme selection (Light, Dark, System)
+      - Font size adjustment
+      - Code theme selection (VS Code themes)
+      - Terminal font preferences
+      - Keyboard shortcuts customization
+      - Notification preferences
+      - Data export (progress, bookmarks)
+      - Reset progress option
+    </settings_preferences>
+
+    <accessibility>
+      - Full keyboard navigation
+      - Screen reader support with ARIA labels
+      - High contrast mode
+      - Reduced motion option
+      - Focus indicators
+      - Skip navigation links
+      - Alt text for all images/diagrams
+    </accessibility>
+
+    <responsive_design>
+      - Mobile-first responsive layout
+      - Collapsible sidebar on mobile
+      - Touch-friendly interface
+      - Swipe gestures for lesson navigation
+      - Adaptive terminal display
+      - PWA support for offline access
+    </responsive_design>
+  </core_features>
+
+  <content_structure>
+    <module_1_getting_started>
+      <lesson_1_1>
+        <title>What is Copilot CLI?</title>
+        <description>Introduction to GitHub Copilot CLI and its capabilities</description>
+        <content>
+          - Overview of Copilot CLI as an AI-powered command line assistant
+          - Comparison with Copilot in IDEs
+          - Key use cases: code generation, explanations, git workflows
+          - How it fits into the developer workflow
+        </content>
+        <duration>5 minutes</duration>
+      </lesson_1_1>
+      <lesson_1_2>
+        <title>Installation Guide</title>
+        <description>Step-by-step installation for all platforms</description>
+        <content>
+          - macOS installation (Homebrew, npm)
+          - Windows installation (WinGet, npm)
+          - Linux installation (script, npm, Homebrew)
+          - Verifying installation with `copilot --version`
+          - Troubleshooting common installation issues
+        </content>
+        <duration>10 minutes</duration>
+        <interactive>Terminal simulation for verification commands</interactive>
+      </lesson_1_2>
+      <lesson_1_3>
+        <title>Authentication Setup</title>
+        <description>Connect Copilot CLI to your GitHub account</description>
+        <content>
+          - Running `copilot` to start authentication
+          - Using `/login` command
+          - Browser-based OAuth flow
+          - Verifying authentication status
+          - Managing multiple accounts
+          - Troubleshooting auth issues
+        </content>
+        <duration>8 minutes</duration>
+      </lesson_1_3>
+      <lesson_1_4>
+        <title>Your First Command</title>
+        <description>Run your first Copilot CLI command</description>
+        <content>
+          - Basic prompt syntax: `copilot "your question"`
+          - Using `-p` flag for prompts
+          - Understanding the response format
+          - Interactive vs one-shot mode
+          - Common first commands to try
+        </content>
+        <duration>10 minutes</duration>
+        <exercise>Write and run 3 different prompts</exercise>
+      </lesson_1_4>
+    </module_1_getting_started>
+
+    <module_2_basic_commands>
+      <lesson_2_1>
+        <title>The Prompt Flag (-p)</title>
+        <description>Master the primary way to interact with Copilot</description>
+        <content>
+          - Syntax: `copilot -p "prompt text"`
+          - Quoting rules for complex prompts
+          - Multi-line prompts
+          - Reading prompts from files
+          - Combining with other flags
+        </content>
+        <duration>12 minutes</duration>
+      </lesson_2_1>
+      <lesson_2_2>
+        <title>Model Selection (--model)</title>
+        <description>Choose the right AI model for your task</description>
+        <content>
+          - Available models: claude-sonnet-4.5, claude-haiku-4.5, gpt-5
+          - Model capabilities comparison
+          - When to use each model
+          - Cost considerations
+          - Default model behavior
+        </content>
+        <duration>10 minutes</duration>
+      </lesson_2_2>
+      <lesson_2_3>
+        <title>Working with Files (--add-dir)</title>
+        <description>Give Copilot context about your project</description>
+        <content>
+          - Adding directory context: `--add-dir .`
+          - Multiple directory support
+          - File filtering and exclusions
+          - Understanding context limits
+          - Best practices for large codebases
+        </content>
+        <duration>15 minutes</duration>
+      </lesson_2_3>
+      <lesson_2_4>
+        <title>Tool Permissions (--allow-all-tools)</title>
+        <description>Enable Copilot to take actions</description>
+        <content>
+          - Understanding tool capabilities
+          - Built-in tools: Read, Write, Edit, Bash, Glob, Grep
+          - Allowing all tools safely
+          - Selective tool permissions
+          - Security considerations
+        </content>
+        <duration>12 minutes</duration>
+      </lesson_2_4>
+      <lesson_2_5>
+        <title>Continuing Sessions (--continue)</title>
+        <description>Maintain context across interactions</description>
+        <content>
+          - How session context works
+          - Using `--continue` flag
+          - Session state persistence
+          - When to start fresh vs continue
+          - Memory management
+        </content>
+        <duration>10 minutes</duration>
+      </lesson_2_5>
+    </module_2_basic_commands>
+
+    <module_3_interactive_mode>
+      <lesson_3_1>
+        <title>Starting Interactive Sessions</title>
+        <description>Use Copilot as a conversational assistant</description>
+        <content>
+          - Running `copilot` without arguments
+          - The interactive prompt interface
+          - Multi-turn conversations
+          - Slash commands (/help, /clear, /exit)
+          - Session history navigation
+        </content>
+        <duration>15 minutes</duration>
+      </lesson_3_1>
+      <lesson_3_2>
+        <title>Slash Commands Reference</title>
+        <description>Master the built-in slash commands</description>
+        <content>
+          - /login - Authenticate with GitHub
+          - /logout - Sign out
+          - /help - Get help
+          - /clear - Clear conversation
+          - /model - Change model
+          - Custom slash commands
+        </content>
+        <duration>10 minutes</duration>
+      </lesson_3_2>
+      <lesson_3_3>
+        <title>Conversation Context Management</title>
+        <description>Effectively use multi-turn conversations</description>
+        <content>
+          - How context accumulates
+          - Referencing previous responses
+          - Building complex solutions iteratively
+          - When context becomes stale
+          - Starting fresh strategically
+        </content>
+        <duration>12 minutes</duration>
+      </lesson_3_3>
+    </module_3_interactive_mode>
+
+    <module_4_tool_integration>
+      <lesson_4_1>
+        <title>Understanding MCP (Model Context Protocol)</title>
+        <description>Extend Copilot with external tools</description>
+        <content>
+          - What is MCP and why it matters
+          - MCP server architecture
+          - The ~/.copilot/mcp-config.json file
+          - Available MCP servers
+          - How tools become available
+        </content>
+        <duration>15 minutes</duration>
+      </lesson_4_1>
+      <lesson_4_2>
+        <title>Playwright MCP for Browser Automation</title>
+        <description>Control browsers with Copilot</description>
+        <content>
+          - Installing Playwright MCP
+          - Configuration in mcp-config.json
+          - Browser navigation commands
+          - Taking screenshots
+          - Clicking, typing, interacting
+          - Use cases: testing, scraping, automation
+        </content>
+        <duration>20 minutes</duration>
+        <exercise>Automate a simple browser task</exercise>
+      </lesson_4_2>
+      <lesson_4_3>
+        <title>File System Tools</title>
+        <description>Master built-in file operations</description>
+        <content>
+          - Read tool: viewing file contents
+          - Write tool: creating files
+          - Edit tool: modifying existing files
+          - Glob tool: finding files by pattern
+          - Grep tool: searching file contents
+          - Best practices for file operations
+        </content>
+        <duration>15 minutes</duration>
+      </lesson_4_3>
+      <lesson_4_4>
+        <title>Bash Tool and Command Execution</title>
+        <description>Run shell commands through Copilot</description>
+        <content>
+          - How Bash tool works
+          - Safety considerations
+          - Command allowlisting
+          - Capturing command output
+          - Chaining commands
+          - Error handling
+        </content>
+        <duration>15 minutes</duration>
+      </lesson_4_4>
+    </module_4_tool_integration>
+
+    <module_5_advanced_patterns>
+      <lesson_5_1>
+        <title>Building Autonomous Agents</title>
+        <description>Create long-running coding agents</description>
+        <content>
+          - The autonomous agent pattern
+          - Two-agent architecture (initializer + coder)
+          - Session management and state
+          - Progress tracking strategies
+          - Error recovery patterns
+          - The Copilot CLI Harness approach
+        </content>
+        <duration>25 minutes</duration>
+      </lesson_5_1>
+      <lesson_5_2>
+        <title>Prompt Engineering for CLI</title>
+        <description>Write effective prompts for better results</description>
+        <content>
+          - Structuring prompts for CLI context
+          - Providing sufficient context
+          - Step-by-step instructions
+          - Examples in prompts
+          - Handling edge cases
+          - Iterative refinement
+        </content>
+        <duration>20 minutes</duration>
+      </lesson_5_2>
+      <lesson_5_3>
+        <title>Custom Instructions and Skills</title>
+        <description>Personalize Copilot behavior</description>
+        <content>
+          - Global custom instructions file
+          - Project-specific instructions
+          - Creating reusable skills
+          - Skill file structure
+          - When skills are loaded
+          - Best practices for customization
+        </content>
+        <duration>18 minutes</duration>
+      </lesson_5_3>
+      <lesson_5_4>
+        <title>Git Workflow Integration</title>
+        <description>Use Copilot for git operations</description>
+        <content>
+          - Generating commit messages
+          - Creating pull request descriptions
+          - Code review assistance
+          - Branch naming suggestions
+          - Changelog generation
+          - Release notes automation
+        </content>
+        <duration>15 minutes</duration>
+        <exercise>Generate commit messages for sample changes</exercise>
+      </lesson_5_4>
+    </module_5_advanced_patterns>
+
+    <module_6_security_best_practices>
+      <lesson_6_1>
+        <title>Security Model Overview</title>
+        <description>Understand Copilot CLI security</description>
+        <content>
+          - Tool permission system
+          - Why allowlists matter
+          - Default security posture
+          - Risk assessment for tasks
+          - Auditing tool usage
+        </content>
+        <duration>12 minutes</duration>
+      </lesson_6_1>
+      <lesson_6_2>
+        <title>Command Allowlisting</title>
+        <description>Safely enable shell commands</description>
+        <content>
+          - The allowlist approach
+          - Safe vs risky commands
+          - Implementing custom allowlists
+          - Validation hooks
+          - Logging and monitoring
+        </content>
+        <duration>15 minutes</duration>
+      </lesson_6_2>
+      <lesson_6_3>
+        <title>Sensitive Data Handling</title>
+        <description>Protect secrets and credentials</description>
+        <content>
+          - Never expose API keys in prompts
+          - Using environment variables
+          - Secure file references
+          - Avoiding accidental exposure
+          - Audit trails
+        </content>
+        <duration>10 minutes</duration>
+      </lesson_6_3>
+    </module_6_security_best_practices>
+
+    <module_7_customization>
+      <lesson_7_1>
+        <title>The ~/.copilot Directory</title>
+        <description>Configure your Copilot environment</description>
+        <content>
+          - Directory structure overview
+          - mcp-config.json for MCP servers
+          - copilot-instructions.md for global instructions
+          - skills/ directory for reusable skills
+          - Managing multiple configurations
+        </content>
+        <duration>15 minutes</duration>
+      </lesson_7_1>
+      <lesson_7_2>
+        <title>Creating Custom Skills</title>
+        <description>Build reusable skill files</description>
+        <content>
+          - Skill file anatomy (SKILL.md)
+          - When to use vs description
+          - Step-by-step workflows
+          - Verification requirements
+          - Skill discovery and loading
+          - Sharing skills across projects
+        </content>
+        <duration>20 minutes</duration>
+        <exercise>Create a custom debugging skill</exercise>
+      </lesson_7_2>
+      <lesson_7_3>
+        <title>Project-Specific Configuration</title>
+        <description>Customize Copilot per project</description>
+        <content>
+          - .github/copilot-instructions.md
+          - Project context and conventions
+          - Architecture documentation
+          - Build and test commands
+          - Integration patterns
+        </content>
+        <duration>12 minutes</duration>
+      </lesson_7_3>
+    </module_7_customization>
+  </content_structure>
+
+  <database_schema>
+    <tables>
+      <users>
+        - id (INTEGER PRIMARY KEY)
+        - username (TEXT UNIQUE)
+        - email (TEXT)
+        - created_at (DATETIME)
+        - last_login (DATETIME)
+        - preferences (JSON: theme, font_size, code_theme)
+      </users>
+
+      <progress>
+        - id (INTEGER PRIMARY KEY)
+        - user_id (INTEGER FOREIGN KEY)
+        - module_id (TEXT)
+        - lesson_id (TEXT)
+        - completed (BOOLEAN)
+        - completed_at (DATETIME)
+        - time_spent_seconds (INTEGER)
+      </progress>
+
+      <quiz_results>
+        - id (INTEGER PRIMARY KEY)
+        - user_id (INTEGER FOREIGN KEY)
+        - lesson_id (TEXT)
+        - score (INTEGER)
+        - max_score (INTEGER)
+        - answers (JSON)
+        - completed_at (DATETIME)
+      </quiz_results>
+
+      <bookmarks>
+        - id (INTEGER PRIMARY KEY)
+        - user_id (INTEGER FOREIGN KEY)
+        - content_type (TEXT: lesson, command, example)
+        - content_id (TEXT)
+        - notes (TEXT)
+        - created_at (DATETIME)
+      </bookmarks>
+
+      <achievements>
+        - id (INTEGER PRIMARY KEY)
+        - user_id (INTEGER FOREIGN KEY)
+        - achievement_id (TEXT)
+        - unlocked_at (DATETIME)
+      </achievements>
+
+      <search_history>
+        - id (INTEGER PRIMARY KEY)
+        - user_id (INTEGER FOREIGN KEY)
+        - query (TEXT)
+        - results_count (INTEGER)
+        - searched_at (DATETIME)
+      </search_history>
+
+      <feedback>
+        - id (INTEGER PRIMARY KEY)
+        - user_id (INTEGER FOREIGN KEY)
+        - content_type (TEXT)
+        - content_id (TEXT)
+        - feedback_type (TEXT: helpful, issue, suggestion)
+        - message (TEXT)
+        - created_at (DATETIME)
+      </feedback>
+
+      <commands>
+        - id (INTEGER PRIMARY KEY)
+        - name (TEXT)
+        - syntax (TEXT)
+        - description (TEXT)
+        - category (TEXT)
+        - examples (JSON)
+        - flags (JSON)
+        - related_commands (JSON)
+      </commands>
+
+      <examples>
+        - id (INTEGER PRIMARY KEY)
+        - title (TEXT)
+        - description (TEXT)
+        - category (TEXT)
+        - difficulty (TEXT: beginner, intermediate, advanced)
+        - code (TEXT)
+        - language (TEXT)
+        - annotations (JSON)
+        - tags (JSON)
+      </examples>
+    </tables>
+  </database_schema>
+
+  <api_endpoints_summary>
+    <content>
+      - GET /api/modules - List all learning modules
+      - GET /api/modules/:id - Get module details with lessons
+      - GET /api/lessons/:id - Get lesson content
+      - GET /api/lessons/:id/quiz - Get quiz for lesson
+      - POST /api/lessons/:id/quiz - Submit quiz answers
+    </content>
+
+    <commands>
+      - GET /api/commands - List all commands (with search/filter)
+      - GET /api/commands/:name - Get command details
+      - GET /api/commands/categories - List command categories
+    </commands>
+
+    <examples>
+      - GET /api/examples - List code examples (with filter)
+      - GET /api/examples/:id - Get example details
+      - GET /api/examples/categories - List example categories
+    </examples>
+
+    <progress>
+      - GET /api/progress - Get user's overall progress
+      - POST /api/progress/lesson/:id - Mark lesson complete
+      - DELETE /api/progress/lesson/:id - Reset lesson progress
+      - GET /api/progress/stats - Get learning statistics
+    </progress>
+
+    <bookmarks>
+      - GET /api/bookmarks - List user's bookmarks
+      - POST /api/bookmarks - Create bookmark
+      - DELETE /api/bookmarks/:id - Remove bookmark
+      - PUT /api/bookmarks/:id - Update bookmark notes
+    </bookmarks>
+
+    <achievements>
+      - GET /api/achievements - List all achievements
+      - GET /api/achievements/user - Get user's unlocked achievements
+    </achievements>
+
+    <search>
+      - GET /api/search?q=query - Global search
+      - GET /api/search/suggestions?q=partial - Search suggestions
+    </search>
+
+    <user>
+      - GET /api/user - Get current user
+      - PUT /api/user/preferences - Update preferences
+      - POST /api/user/feedback - Submit feedback
+      - GET /api/user/export - Export user data
+    </user>
+
+    <terminal>
+      - POST /api/terminal/execute - Execute simulated command
+      - POST /api/terminal/reset - Reset terminal state
+      - GET /api/terminal/scenarios/:id - Get scenario config
+    </terminal>
+  </api_endpoints_summary>
+
+  <ui_layout>
+    <main_structure>
+      - Two-column layout: sidebar (navigation), main (content)
+      - Collapsible sidebar with module tree
+      - Top header with search and user menu
+      - Breadcrumb navigation
+      - Footer with quick links
+    </main_structure>
+
+    <sidebar>
+      - Logo and app name
+      - Search input
+      - Module accordion tree
+      - Progress indicators per module
+      - Quick links: Commands, Examples, Cheat Sheets
+      - User profile section
+      - Settings gear icon
+    </sidebar>
+
+    <main_content_area>
+      <lesson_view>
+        - Lesson title and metadata (duration, difficulty)
+        - Progress indicator
+        - Content area with markdown rendering
+        - Code blocks with syntax highlighting
+        - Interactive terminal (when applicable)
+        - Quiz section (expandable)
+        - Next/Previous lesson navigation
+        - Bookmark button
+      </lesson_view>
+      
+      <command_reference_view>
+        - Command name as heading
+        - Syntax block with highlighting
+        - Description section
+        - Flags/options table
+        - Examples with copy buttons
+        - Related commands sidebar
+        - "Try it" button for terminal
+      </command_reference_view>
+
+      <examples_view>
+        - Filter bar (category, difficulty, language)
+        - Card grid layout
+        - Example title and description
+        - Difficulty badge
+        - Language tag
+        - Preview of first few lines
+        - Click to expand full view
+      </examples_view>
+
+      <terminal_simulator>
+        - Dark terminal-style background
+        - Monospace font
+        - Command prompt indicator
+        - Input line with cursor
+        - Scrollable output history
+        - Clear button
+        - Reset button
+        - Full-screen toggle
+        - Copy output button
+      </terminal_simulator>
+    </main_content_area>
+
+    <modals>
+      - Settings modal with tabs
+      - Search results overlay
+      - Quiz completion modal
+      - Achievement unlocked popup
+      - Feedback form modal
+      - Keyboard shortcuts modal
+    </modals>
+  </ui_layout>
+
+  <design_system>
+    <color_palette>
+      - Primary: Blue (#3B82F6) for actions and links
+      - Secondary: Purple (#8B5CF6) for highlights
+      - Success: Green (#10B981) for completed items
+      - Background: White (light), #0D1117 (dark - GitHub style)
+      - Surface: #F3F4F6 (light), #161B22 (dark)
+      - Text: #1F2937 (light), #C9D1D9 (dark)
+      - Code background: #1E1E1E (VS Code style)
+      - Terminal: #0C0C0C background, #00FF00 text (optional retro)
+    </color_palette>
+
+    <typography>
+      - Sans-serif: Inter, system-ui for UI
+      - Monospace: JetBrains Mono, Fira Code for code
+      - Headings: font-bold, tracking-tight
+      - Body: font-normal, leading-relaxed
+      - Code: font-mono, text-sm
+    </typography>
+
+    <components>
+      <buttons>
+        - Primary: Blue background, white text, rounded-lg
+        - Secondary: Border style, hover fill
+        - Ghost: No background, hover background
+        - Icon: Square with tooltip
+      </buttons>
+
+      <cards>
+        - Rounded-lg corners
+        - Subtle shadow (light mode)
+        - Border (dark mode)
+        - Hover: slight lift effect
+      </cards>
+
+      <code_blocks>
+        - Dark background always
+        - Language badge top-right
+        - Copy button on hover
+        - Line numbers optional
+        - Highlighted lines support
+      </code_blocks>
+
+      <terminal>
+        - Black/dark gray background
+        - Green or white text
+        - Cursor blink animation
+        - Scrollbar styled
+        - Selection highlight
+      </terminal>
+
+      <progress_indicators>
+        - Circular for modules
+        - Linear bar for overall
+        - Checkmarks for completed
+        - Animated on change
+      </progress_indicators>
+    </components>
+
+    <animations>
+      - Page transitions: fade + slide
+      - Sidebar collapse: smooth width
+      - Modal: fade + scale
+      - Terminal typing: character by character
+      - Progress: smooth fill
+      - Achievement popup: bounce in
+    </animations>
+  </design_system>
+
+  <implementation_steps>
+    <step number="1">
+      <title>Project Setup and Core Structure</title>
+      <tasks>
+        - Initialize Vite + React project
+        - Set up Tailwind CSS
+        - Create Express backend with SQLite
+        - Implement basic routing structure
+        - Create layout components (Sidebar, Header, Main)
+        - Set up theme system (light/dark)
+      </tasks>
+    </step>
+
+    <step number="2">
+      <title>Content Management System</title>
+      <tasks>
+        - Define content data structures
+        - Create module and lesson schemas
+        - Populate initial lesson content
+        - Build markdown rendering with syntax highlighting
+        - Create command reference data
+        - Build example code library
+      </tasks>
+    </step>
+
+    <step number="3">
+      <title>Navigation and Discovery</title>
+      <tasks>
+        - Build sidebar with module tree
+        - Implement breadcrumb navigation
+        - Create lesson navigation (next/prev)
+        - Build search functionality
+        - Add command palette (Cmd+K)
+        - Implement filters for examples
+      </tasks>
+    </step>
+
+    <step number="4">
+      <title>Interactive Terminal Simulator</title>
+      <tasks>
+        - Build terminal UI component
+        - Implement command input handling
+        - Create simulated command responses
+        - Add animated typing effect
+        - Build scenario system for lessons
+        - Add copy and reset functionality
+      </tasks>
+    </step>
+
+    <step number="5">
+      <title>Progress Tracking System</title>
+      <tasks>
+        - Implement user/session management
+        - Create progress tracking APIs
+        - Build progress UI indicators
+        - Add completion animations
+        - Implement bookmark system
+        - Create learning stats dashboard
+      </tasks>
+    </step>
+
+    <step number="6">
+      <title>Quizzes and Assessments</title>
+      <tasks>
+        - Design quiz question format
+        - Build quiz UI component
+        - Implement answer validation
+        - Create score tracking
+        - Add quiz results display
+        - Build achievement system
+      </tasks>
+    </step>
+
+    <step number="7">
+      <title>Command Reference Section</title>
+      <tasks>
+        - Build command list view
+        - Create individual command pages
+        - Implement search and filter
+        - Add "try it" integration
+        - Build related commands
+        - Create printable cheat sheets
+      </tasks>
+    </step>
+
+    <step number="8">
+      <title>Settings and Customization</title>
+      <tasks>
+        - Build settings modal
+        - Implement theme switching
+        - Add font size controls
+        - Create code theme selector
+        - Build keyboard shortcuts
+        - Add data export
+      </tasks>
+    </step>
+
+    <step number="9">
+      <title>Polish and Optimization</title>
+      <tasks>
+        - Mobile responsive design
+        - Accessibility audit and fixes
+        - Performance optimization
+        - Add loading states
+        - Implement error handling
+        - Final visual polish
+      </tasks>
+    </step>
+  </implementation_steps>
+
+  <success_criteria>
+    <functionality>
+      - All lesson content renders correctly
+      - Terminal simulator works smoothly
+      - Progress tracking persists correctly
+      - Search returns relevant results
+      - All navigation paths work
+      - Quizzes score correctly
+    </functionality>
+
+    <user_experience>
+      - Clear learning progression
+      - Intuitive navigation
+      - Fast page loads
+      - Smooth animations
+      - Helpful error messages
+      - Accessible on all devices
+    </user_experience>
+
+    <technical_quality>
+      - Clean component architecture
+      - Proper error handling
+      - Responsive on all screen sizes
+      - Keyboard navigable
+      - Proper loading states
+      - No console errors
+    </technical_quality>
+
+    <content_quality>
+      - Accurate command documentation
+      - Working code examples
+      - Progressive difficulty
+      - Comprehensive coverage
+      - Up-to-date with Copilot CLI
+    </content_quality>
+  </success_criteria>
+</project_specification>

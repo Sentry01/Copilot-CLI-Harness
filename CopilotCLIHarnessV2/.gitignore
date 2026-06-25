@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+
+# Harness runtime artifacts
+harness_logs/
+.harness/
+.playwright-mcp/
+
+# Editors / OS
+.vscode/
+.DS_Store
