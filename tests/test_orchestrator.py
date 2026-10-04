@@ -311,3 +311,22 @@ def test_until_stops_after_requested_phase(tmp_path):
     h, *_ = make(tmp_path, coder=honest_coder)
     assert run(h, until="plan") == "reached phase 'plan'"
     assert h.paths.test_plan.exists() and not h.paths.lock.exists()
+
+
+def test_symlinks_escaping_the_project_are_quarantined(tmp_path):
+    made = []
+
+    def linker(t: FakeTurn) -> None:
+        link = t.spec.working_directory / "app" / "home"
+        if not made:
+            made.append(1)
+            link.symlink_to(Path.home(), target_is_directory=True)  # e.g. via `node -e fs.symlinkSync(...)`
+            (t.spec.working_directory / "app" / "inside").symlink_to(t.spec.working_directory / "app")
+        honest_coder(t)
+
+    h, *_ = make(tmp_path, coder=linker)
+    assert run(h).startswith("done")
+    assert not (h.paths.app / "home").is_symlink()
+    assert (h.paths.app / "inside").is_symlink()  # links that stay inside the project are fine
+    violations = [v for s in state_of(h).sessions for v in s.violations]
+    assert "symlink app/home pointed outside the project (quarantined)" in violations

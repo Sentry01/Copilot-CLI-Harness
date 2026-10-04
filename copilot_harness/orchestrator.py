@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import contextlib
 import json
+import os
 from collections import defaultdict
 from collections.abc import Callable, Iterable
 from pathlib import Path
@@ -299,10 +300,12 @@ class Harness:
         )
         record = SessionRecord(n=n, role=role, mode=mode, targets=list(targets))
         before = self._dirty_snapshot()
+        links_before = self._escaping_symlinks()
         self.out(f"▶ session {n}: {role}{f' ({mode})' if mode else ''}{f' — {len(record.targets)} targets' if record.targets else ''}")
         outcome = await self.backend.run(spec)
         record.violations = self.enforce_scope(policy, tag=f"session-{n:04d}", before=before,
-                                               lock_exempt=lock_exempt) + [f"denied: {d}" for d in outcome.denials[:20]]
+                                               lock_exempt=lock_exempt)
+        record.violations += self._quarantine_new_symlinks(links_before, f"session-{n:04d}") + [f"denied: {d}" for d in outcome.denials[:20]]
         record.credits, record.timed_out, record.error = outcome.credits, outcome.timed_out, outcome.error
         record.ended_at = utcnow()
         self.state.sessions.append(record)
@@ -325,6 +328,31 @@ class Harness:
             path = self.paths.root / entry.path
             snap[entry.path] = sha256_file(path) if path.is_file() else "<deleted>"
         return snap
+
+    def _escaping_symlinks(self) -> set[str]:
+        """Symlinks inside the project whose target resolves outside it (dependency folders excluded)."""
+        root = self.paths.root
+        found: set[str] = set()
+        for dirpath, dirnames, filenames in os.walk(root):
+            dirnames[:] = [d for d in dirnames if d not in (".git", "node_modules", ".harness")]
+            for name in [*dirnames, *filenames]:
+                path = Path(dirpath) / name
+                if not path.is_symlink():
+                    continue
+                target = Path(os.path.realpath(path))
+                if target != root and root not in target.parents:
+                    found.add(path.relative_to(root).as_posix())
+        return found
+
+    def _quarantine_new_symlinks(self, before: set[str], tag: str) -> list[str]:
+        """Links created during a session that point outside the project would let later writes escape the
+        scope checks unseen (git does not track what is written through them), so they are quarantined."""
+        new = sorted(self._escaping_symlinks() - before)
+        for rel in new:
+            dst = self.paths.quarantine / tag / rel
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            os.replace(self.paths.root / rel, dst)
+        return [f"symlink {rel} pointed outside the project (quarantined)" for rel in new]
 
     def enforce_scope(self, policy: Policy, tag: str, before: dict[str, str] | None = None,
                       lock_exempt: Iterable[str] = ()) -> list[str]:
