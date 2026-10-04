@@ -6,9 +6,9 @@ import pytest
 
 from copilot_harness.config import TestsConfig
 from copilot_harness.models import RequirementsDoc, TestPlan
-from copilot_harness.validators import validate_requirements, validate_test_plan
+from copilot_harness.validators import validate_contract, validate_requirements, validate_test_plan
 
-from .notes_project import PLAN, REQUIREMENTS
+from .notes_project import CONTRACT, PLAN, REQUIREMENTS
 
 
 @pytest.fixture
@@ -113,3 +113,34 @@ def test_delta_cannot_retire_all_tests_of_an_active_requirement(tmp_path, cfg):
                           "priority": "P1", "req_ids": ["REQ-005"], "steps": ["s"], "expected": ["e"], "origin": "CHG-001"})
     _, issues = validate_test_plan(write(tmp_path, "p.json", plan), reqs, cfg, previous, "CHG-001")
     assert any("REQ-002 (Security headers) has no tests" in i for i in issues)
+
+
+def test_delta_retirement_needs_a_superseded_requirement(tmp_path, cfg):
+    """Matches the CI gate: retiring is allowed when at least one traced requirement is superseded."""
+    reqs_data = copy.deepcopy(REQUIREMENTS)
+    reqs_data["requirements"][1].update(status="superseded", superseded_by=["REQ-005"])
+    reqs_data["requirements"].append({"id": "REQ-005", "title": "Headers v2", "type": "security", "priority": "P1",
+                                      "description": "desc", "acceptance_criteria": ["a"], "origin": "CHG-001"})
+    reqs = RequirementsDoc.model_validate(reqs_data)
+    prev = copy.deepcopy(PLAN)
+    sec = next(t for t in prev["tests"] if t["id"] == "SEC-001")
+    sec["req_ids"] = ["REQ-002", "REQ-001"]  # one superseded, one still active
+    previous = TestPlan.model_validate(prev)
+    plan = copy.deepcopy(prev)
+    for t in plan["tests"]:
+        if t["id"] in ("SEC-001", "FUNC-001"):
+            t["status"] = "retired"  # FUNC-001 traces only to REQ-001, which is active
+    plan["tests"].append({"id": "SEC-002", "title": "headers v2", "category": "security", "group": "headers",
+                          "priority": "P1", "req_ids": ["REQ-005"], "steps": ["s"], "expected": ["e"],
+                          "origin": "CHG-001"})
+    _, issues = validate_test_plan(write(tmp_path, "p.json", plan), reqs, cfg, previous, "CHG-001")
+    text = "\n".join(issues)
+    assert "FUNC-001 was retired but none of its requirements were superseded" in text
+    assert "SEC-001 was retired" not in text
+
+
+def test_contract_reset_hook_must_stay_on_the_app(tmp_path):
+    for hook in ("POST //external.example/reset", "POST https://external.example/reset", "POST /\\evil.example"):
+        data = {**CONTRACT, "test_hooks": {"reset": hook}}
+        contract, issues = validate_contract(write(tmp_path, "c.json", data))
+        assert contract is None and any("reset" in i for i in issues), hook

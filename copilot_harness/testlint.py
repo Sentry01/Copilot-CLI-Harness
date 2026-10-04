@@ -36,14 +36,26 @@ FORBIDDEN = [
     (re.compile(r"(?<![.\w])setTimeout\s*\("), "setTimeout in specs is forbidden; use expect.poll / waitFor* with a condition"),
     (re.compile(r"\bpage\.pause\s*\("), "page.pause() blocks headless runs"),
     (re.compile(r"\bMath\.random\s*\("), "Math.random makes runs non-deterministic; use uniqueId(testInfo) from support"),
+    # The suite talks only to the app under test (the runner also blocks every other host).
+    (re.compile(r"(?:\.(?:goto|get|post|put|patch|delete|head|fetch|newContext)|(?<![.\w$])fetch)\s*\(\s*"
+                r"(?:['\"`]\s*(?:[a-z][\w+.-]*:)?//|\{[^}]*\bbaseURL\s*:)", re.I),
+     "requests must use relative paths against baseURL (e.g. page.goto('/login')); absolute and off-origin "
+     "destinations are forbidden"),
+    (re.compile(r"(?<![.\w$])(?:require|import)\s*\("), "require()/dynamic import() is forbidden; import from the kit"),
 ]
+
+# Specs import only from the acceptance kit (plus type-only imports from Playwright), so they
+# can't bypass its fixtures or open their own network/process channels.
+IMPORT = re.compile(r"(?<![.\w$])import\s+(?P<type>type\s+)?(?:[^'\";]*?\bfrom\s*)?(?P<q>['\"])(?P<mod>[^'\"]+)(?P=q)")
+KIT_MODULE = re.compile(r"^(?:\.\./)+support(?:/index)?$|^\./support(?:/index)?$")
 # (pattern, message) — warnings are reported but do not block.
 DISCOURAGED = [
     (re.compile(r"\bforce\s*:\s*true"), "force: true bypasses actionability checks and hides real UI bugs"),
     (re.compile(r"networkidle"), "networkidle is flaky; wait for a specific element or response"),
     (re.compile(r"\bDate\.now\s*\("), "Date.now() varies per run; prefer uniqueId(testInfo) for data and measure() for timing"),
     (re.compile(r"https?://(?!localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])[\w.-]+\.[a-z]{2,}"),
-     "hard-coded external URL; tests must target baseURL (ignore if this is an attack payload)"),
+     "external URL in a spec: fine as payload data (e.g. an open-redirect target), but the runner blocks "
+     "every host except the app"),
 ]
 
 
@@ -237,6 +249,16 @@ def lint_source(src: str, file: str) -> tuple[list[SpecTest], list[LintIssue]]:
     for pattern, message in FORBIDDEN:
         for m in pattern.finditer(code):
             issues.append(LintIssue(file, _line_of(code, m.start()), "error", message, _test_at(tests, code, m.start())))
+    for m in IMPORT.finditer(code):
+        mod = m.group("mod")
+        if KIT_MODULE.match(mod) or (m.group("type") and mod == "@playwright/test"):
+            continue
+        issues.append(LintIssue(
+            file, _line_of(code, m.start()), "error",
+            f"import from {mod!r} is forbidden; specs import only from the kit ('../../support') "
+            "and type-only from '@playwright/test'",
+            _test_at(tests, code, m.start()),
+        ))
     for pattern, message in DISCOURAGED:
         for m in pattern.finditer(code):
             issues.append(LintIssue(file, _line_of(code, m.start()), "warning", message, _test_at(tests, code, m.start())))

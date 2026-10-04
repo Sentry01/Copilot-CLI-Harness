@@ -180,7 +180,27 @@ def test_base_ref_rejects_retiring_tests_of_active_requirements(project):
     project.test_plan.write_text(json.dumps(plan, indent=2))
     relock(project)
     r = gate(project, report(ALL_PASS), "--base-ref", base)
-    assert r.returncode == 1 and "UX-001 was retired but its requirements are still active: REQ-004" in r.stdout
+    assert r.returncode == 1 and "UX-001 was retired but none of its requirements were superseded: REQ-004" in r.stdout
+
+
+def test_base_ref_accepts_retiring_tests_of_superseded_requirements(project):
+    plan = json.loads(project.test_plan.read_text())
+    next(t for t in plan["tests"] if t["id"] == "UX-001")["req_ids"] = ["REQ-004", "REQ-001"]
+    project.test_plan.write_text(json.dumps(plan, indent=2))
+    relock(project)
+    base = Git(project.root).commit_all("UX-001 also traces to REQ-001")
+    reqs = json.loads(project.requirements.read_text())
+    old = next(r for r in reqs["requirements"] if r["id"] == "REQ-004")
+    reqs["requirements"].append({**old, "id": "REQ-005", "origin": "CHG-001"})
+    old.update(status="superseded", superseded_by=["REQ-005"])
+    project.requirements.write_text(json.dumps(reqs, indent=2))
+    plan = json.loads(project.test_plan.read_text())
+    next(t for t in plan["tests"] if t["id"] == "UX-001")["status"] = "retired"
+    project.test_plan.write_text(json.dumps(plan, indent=2))
+    relock(project)
+    r = gate(project, report(ALL_PASS), "--base-ref", base)
+    assert "UX-001 was retired" not in r.stdout
+    assert "REQ-004 was edited" not in r.stdout
 
 
 def test_base_ref_requires_authorization_for_kit_changes(project):

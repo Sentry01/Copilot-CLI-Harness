@@ -187,7 +187,7 @@ def validate_test_plan(
     if previous is None:
         issues += _check_distribution(plan, cfg)
     else:
-        issues += _check_append_only_plan(previous, plan, cfg, delta_origin)
+        issues += _check_append_only_plan(previous, plan, requirements, cfg, delta_origin)
 
     issues += coverage_issues(requirements, plan)
     return (plan if not issues else None), issues[:MAX_ISSUES]
@@ -212,10 +212,11 @@ def _check_distribution(plan: TestPlan, cfg: TestsConfig) -> list[str]:
 
 
 def _check_append_only_plan(
-    previous: TestPlan, plan: TestPlan, cfg: TestsConfig, delta_origin: str | None
+    previous: TestPlan, plan: TestPlan, requirements: RequirementsDoc, cfg: TestsConfig, delta_origin: str | None
 ) -> list[str]:
     issues = []
     current = plan.by_id()
+    reqs = requirements.by_id()
     for old in previous.tests:
         new = current.get(old.id)
         if new is None:
@@ -225,6 +226,14 @@ def _check_append_only_plan(
             issues.append(f"{old.id} was edited; existing tests may only change status to retired")
         if old.status == "retired" and new.status == "active":
             issues.append(f"{old.id} was retired and cannot be reactivated; add a new test instead")
+        # Same rule as the CI gate: only a superseded requirement can retire a test.
+        if old.status == "active" and new.status == "retired" and not any(
+            rid in reqs and reqs[rid].status != "active" for rid in new.req_ids
+        ):
+            issues.append(
+                f"{old.id} was retired but none of its requirements were superseded; "
+                "only tests of superseded requirements can be retired"
+            )
     added = [t for t in plan.tests if t.id not in previous.by_id()]
     if delta_origin is not None:
         if not cfg.delta_min <= len(added) <= cfg.delta_max:

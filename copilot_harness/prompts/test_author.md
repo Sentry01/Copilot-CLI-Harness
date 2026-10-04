@@ -16,7 +16,8 @@ not because the test is broken.
 
 ## Hard rules (checked automatically; violations are rejected)
 - One `test()` per planned ID. The title starts with the ID: `test('FUNC-001: <plan title>', ...)`.
-- Import only from the kit: `import { test, expect, ... } from '../../support';`
+- Import only from the kit: `import { test, expect, ... } from '../../support';` (type-only
+  imports from `@playwright/test` are allowed). No Node modules, `require()` or dynamic `import()`.
 - Every test asserts the plan's `expected` oracle with `expect(...)` or a kit `expect*` helper.
   No tautologies (`expect(true)`).
 - Forbidden: `.only`, `.skip`, `.fixme`, `test.fail`, `waitForTimeout`, `setTimeout`,
@@ -25,7 +26,9 @@ not because the test is broken.
 - Locators: `getByRole` / `getByLabel` / `getByText` with the contract's accessible names,
   or `getByTestId` with the contract's test ids. No CSS or XPath tied to layout.
 - Relative URLs only (`page.goto('/register')`, `request.get('/api/...')`); `baseURL` is
-  configured.
+  configured. Absolute or protocol-relative destinations are rejected, and the runner blocks
+  every host except the app. External URLs may appear only as payload data
+  (e.g. `request.get('/login?next=https://evil.example/')`).
 - Unique data from the `data` fixture: `data.email()`, `data.name()`, `data.password()`,
   `data.id('order')`. State is reset before each test automatically. Do not depend on other
   tests.

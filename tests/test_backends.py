@@ -102,3 +102,41 @@ def test_cli_session_deadline_covers_continuations(tmp_path: Path):
     assert time.monotonic() - started < 6  # bounded by the deadline, not by 50 continuations
     assert outcome.timed_out and not outcome.ok
     assert len(checks) < 5
+
+
+def test_cli_stop_check_shares_the_session_deadline(tmp_path: Path):
+    """A stop check (the suite run) that outlives the deadline is cancelled, and the
+    process group it started is killed rather than left running."""
+    import asyncio
+    import os
+    import time
+
+    from copilot_harness.runner import run_command
+
+    fake = tmp_path / "copilot"
+    fake.write_text("#!/bin/sh\necho '{\"type\":\"assistant.message\",\"data\":{\"content\":\"done\"}}'\n")
+    fake.chmod(0o755)
+    pid_file = tmp_path / "suite.pid"
+
+    async def slow_suite():
+        await run_command(f"echo $$ > {pid_file}; exec sleep 30", tmp_path, timeout_s=60)
+        return "still failing"
+
+    spec = SessionSpec(role="coder", prompt="p", instructions="i", policy=Policy(root=tmp_path, role="coder"),
+                       working_directory=tmp_path, timeout_s=1.0, stop_check=slow_suite, max_stop_blocks=5,
+                       log_dir=tmp_path / "log")
+    started = time.monotonic()
+    outcome = asyncio.run(CliBackend(cli_path=str(fake), verbose=False).run(spec))
+    assert time.monotonic() - started < 5
+    assert outcome.timed_out and not outcome.ok
+    assert "stop check" in (outcome.error or "")
+    pid = int(pid_file.read_text())
+    deadline = time.monotonic() + 3
+    while time.monotonic() < deadline:
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            break
+        time.sleep(0.05)
+    else:
+        pytest.fail("the suite's process group survived the cancelled stop check")

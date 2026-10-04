@@ -73,6 +73,32 @@ def grep_for(ids: Iterable[str]) -> str:
     return "(" + "|".join(sorted(re.escape(i) for i in ids)) + "):"
 
 
+STOP_GRACE_S = 10.0
+
+
+def _signal_group(proc: asyncio.subprocess.Process, sig: int) -> None:
+    with contextlib.suppress(ProcessLookupError, PermissionError):
+        os.killpg(proc.pid, sig)
+
+
+async def _stop_group(proc: asyncio.subprocess.Process, grace_s: float = STOP_GRACE_S) -> bytes:
+    """Stop a command's process group and return its remaining output.
+
+    SIGINT first: Playwright starts the app server and browsers in process groups of their own
+    and only shuts them down on a graceful stop; a bare SIGKILL would orphan them. Whatever is
+    left after ``grace_s`` is killed.
+    """
+    out = None
+    if proc.returncode is None:
+        _signal_group(proc, signal.SIGINT)
+        with contextlib.suppress(TimeoutError):
+            out, _ = await asyncio.wait_for(proc.communicate(), grace_s)
+    _signal_group(proc, signal.SIGKILL)
+    if out is None:
+        out, _ = await proc.communicate()
+    return out or b""
+
+
 async def run_command(
     argv: list[str] | str,
     cwd: Path,
@@ -98,9 +124,15 @@ async def run_command(
         out, _ = await asyncio.wait_for(proc.communicate(), timeout=timeout_s)
     except TimeoutError:
         timed_out = True
-        with contextlib.suppress(ProcessLookupError):
-            os.killpg(proc.pid, signal.SIGKILL)
-        out, _ = await proc.communicate()
+        out = await _stop_group(proc)
+    except BaseException:
+        # Cancelled (e.g. by an outer deadline) or interrupted: never leave the group running.
+        try:
+            await _stop_group(proc)
+        finally:
+            if proc.returncode is None:
+                _signal_group(proc, signal.SIGKILL)
+        raise
     text = (out or b"").decode("utf-8", errors="replace")
     if log_path is not None:
         log_path.parent.mkdir(parents=True, exist_ok=True)
@@ -330,10 +362,18 @@ class TestRunner:
         return sorted(report.outcomes), report.collection_errors
 
 
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, *args: object, **kwargs: object) -> None:
+        return None  # report the 3xx itself; never follow the app somewhere else
+
+
+_OPENER = urllib.request.build_opener(_NoRedirect)
+
+
 def _http_status(method: str, url: str) -> int:
     req = urllib.request.Request(url, method=method.upper())
     try:
-        with urllib.request.urlopen(req, timeout=5) as resp:
+        with _OPENER.open(req, timeout=5) as resp:
             return resp.status
     except urllib.error.HTTPError as exc:
         return exc.code

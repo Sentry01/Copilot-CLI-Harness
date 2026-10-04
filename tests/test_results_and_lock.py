@@ -111,3 +111,22 @@ def test_lock_detects_and_restores_drift(tmp_path: Path):
     assert spec.read_text() == "original"
     assert (paths.quarantine / "t1" / "acceptance/specs/functional/extra.spec.ts").read_text() == "sneaky"
     assert subprocess.run(["git", "-C", str(tmp_path), "status", "--porcelain"], capture_output=True, text=True).stdout == ""
+
+
+def test_commit_paths_commits_only_the_given_paths(tmp_path: Path):
+    git = Git(tmp_path)
+    git.init()
+    (tmp_path / "keep.txt").write_text("v1")
+    (tmp_path / "gone.txt").write_text("v1")
+    git.commit_all("init")
+    (tmp_path / "a.txt").write_text("harness")
+    (tmp_path / "gone.txt").unlink()
+    (tmp_path / "b.txt").write_text("someone else's staged work")
+    git.run("add", "b.txt")
+
+    git.commit_paths("harness: a", ["a.txt", "gone.txt", "missing.txt"])
+    committed = set(git.run("show", "--name-only", "--format=", "HEAD").split())
+    assert committed == {"a.txt", "gone.txt"}
+    assert git.run("diff", "--cached", "--name-only").split() == ["b.txt"]  # still staged, not committed
+    head = git.head()
+    assert git.commit_paths("noop", ["a.txt"]) == head

@@ -7,7 +7,7 @@
  */
 import { createHash } from 'node:crypto';
 import { test as base, expect, type TestInfo } from '@playwright/test';
-import { contract } from './contract';
+import { appBaseURL, contract } from './contract';
 
 export function uniqueId(testInfo: TestInfo, salt = ''): string {
   const seed = `${process.env.HARNESS_RUN_ID ?? 'local'}|${testInfo.testId}|${testInfo.repeatEachIndex}|${testInfo.retry}|${salt}`;
@@ -34,6 +34,20 @@ export class TestData {
   }
 }
 
+/**
+ * Resolve the contract's reset hook ("POST /__test__/reset") to an absolute URL on the app.
+ * Anything that would leave the app's origin ("//host/x", "/\\host", a full URL) is refused.
+ */
+export function resetHookRequest(hook: string, baseURL = appBaseURL()): { method: string; url: string } {
+  const m = /^(GET|POST|PUT|PATCH|DELETE) (\/(?!\/)[^\s\\]*)$/.exec(hook.trim());
+  if (!m) throw new Error(`test_hooks.reset must look like "POST /__test__/reset" (got "${hook}")`);
+  const url = new URL(m[2], baseURL);
+  if (url.origin !== new URL(baseURL).origin) {
+    throw new Error(`test_hooks.reset "${hook}" resolves outside the app (${url.origin})`);
+  }
+  return { method: m[1], url: url.href };
+}
+
 type Fixtures = { data: TestData; resetAppState: void };
 
 export const test = base.extend<Fixtures>({
@@ -44,8 +58,8 @@ export const test = base.extend<Fixtures>({
     async ({ request }, use) => {
       const hook = contract.test_hooks?.reset;
       if (hook && process.env.HARNESS_NO_RESET !== '1') {
-        const [method, path] = hook.trim().split(/\s+/, 2);
-        const res = await request.fetch(path, { method });
+        const { method, url } = resetHookRequest(hook);
+        const res = await request.fetch(url, { method, maxRedirects: 0 });
         if (!res.ok()) {
           throw new Error(`state reset hook "${hook}" failed with ${res.status()}; the app must implement it in test mode`);
         }

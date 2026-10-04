@@ -8,6 +8,7 @@ resuming the same session (``--resume <id>``) with the remaining failures.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import shutil
 import time
@@ -107,7 +108,13 @@ class CliBackend(AgentBackend):
                 break
             if spec.stop_check is None or outcome.stop_blocks >= spec.max_stop_blocks:
                 break
-            reason = await spec.stop_check()
+            try:
+                # The stop check runs the test suite; it shares the session's deadline.
+                reason = await asyncio.wait_for(spec.stop_check(), max(deadline - time.monotonic(), 0.001))
+            except TimeoutError:
+                outcome.ok, outcome.timed_out = False, True
+                outcome.error = f"session exceeded {spec.timeout_s / 60:.0f} minutes during the stop check"
+                break
             if not reason:
                 break
             outcome.stop_blocks += 1

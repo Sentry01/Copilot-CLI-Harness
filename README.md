@@ -95,6 +95,8 @@ Every step is a git commit by the harness (`harness: freeze acceptance suite v1 
 - **Lint + compile + red check.** No skips, sleeps, randomness, missing assertions or
   tautologies. Every new test must fail before the feature exists. Tests that pass anyway
   get a vacuity review.
+- **Hermetic.** Tests reach only the app under test. Other hosts (CDNs, third-party APIs) are
+  blocked in the browser and in API requests, so results don't depend on the internet.
 - **Stable before baseline.** Newly passing tests must pass 3 repeated runs before they count.
 - **Frozen.** The coder agent can't write `acceptance/` or `harness/`. Its permissions
   deny it, and anything that slips through is reverted after the session. CI re-checks the

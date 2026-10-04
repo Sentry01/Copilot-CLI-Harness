@@ -43,4 +43,4 @@ def test_every_kit_helper_passes_good_and_catches_bad(tmp_path: Path) -> None:
     run = subprocess.run(["npx", "playwright", "test", "--reporter=list"], cwd=paths.acceptance, env=env,
                          capture_output=True, text=True, timeout=600)
     assert run.returncode == 0, run.stdout[-6000:] + run.stderr[-2000:]
-    assert "18 passed" in run.stdout, run.stdout[-3000:]
+    assert "23 passed" in run.stdout, run.stdout[-3000:]

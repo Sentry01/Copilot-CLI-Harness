@@ -32,9 +32,10 @@ specified now, precisely.
 - Use semantic HTML and accessible names first (tests prefer `getByRole` / `getByLabel`).
   Use `testids` only where no stable accessible name exists.
 - Record exact user-facing messages that tests will assert on.
-- `test_hooks.reset` must restore a clean, seeded state. It may only be enabled when
-  `NODE_ENV=test` or `APP_ENV=test`, and must return 404 otherwise. The acceptance fixtures call
-  it before every test.
+- `test_hooks.reset` is `"METHOD /path"` on the app itself (no host, no `//`). It must restore
+  a clean, seeded state, answer 2xx without redirecting, and may only be enabled when
+  `NODE_ENV=test` or `APP_ENV=test` (404 otherwise). The acceptance fixtures call it before
+  every test.
 - Errors are JSON `{"error": "..."}` with correct status codes (400/401/403/404/409/422/429).
 
 ## 2. `harness/app-contract.json`
@@ -59,6 +60,8 @@ specified now, precisely.
 - Use the stack the PRD asks for. Otherwise choose a mainstream, well-documented stack that
   runs with Node 22 or Python 3.12 and needs no external services. Prefer SQLite and file
   storage over databases that must be installed separately.
+- Serve every asset (scripts, styles, fonts, images) from the app itself. The acceptance runner
+  blocks all hosts except the app, so CDN or third-party resources fail to load in tests.
 - Use `npm ci` only if you generate `app/package-lock.json` (run `npm install` once in `app/`).
 
 ## 3. Scaffold `app/`

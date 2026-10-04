@@ -117,7 +117,10 @@ class TestHooks(BaseModel):
     __test__ = False  # not a pytest test class
 
     model_config = ConfigDict(extra="allow")
-    reset: str | None = Field(default=None, description="e.g. 'POST /__test__/reset'")
+    # A same-origin path only: "//host/x", "/\\host" or a full URL would send the reset elsewhere.
+    reset: str | None = Field(
+        default=None, pattern=r"^(GET|POST|PUT|PATCH|DELETE) /([^/\s\\][^\s\\]*)?$", description="e.g. 'POST /__test__/reset'"
+    )
     seed_users: list[dict[str, Any]] = Field(default_factory=list)
 
 
@@ -137,7 +140,7 @@ class AppContract(_Strict):
     build: list[str] = Field(default_factory=list)
     start: str = Field(min_length=1)
     base_url: str = Field(default="http://127.0.0.1:3000", pattern=r"^https?://")
-    health_path: str = Field(default="/health", pattern=r"^/")
+    health_path: str = Field(default="/health", pattern=r"^/([^/\s\\][^\s\\]*)?$")
     env: dict[str, str] = Field(default_factory=dict)
     startup_timeout_seconds: int = Field(default=120, ge=5, le=900)
 

@@ -76,13 +76,14 @@ class Git:
         return self.head()
 
     def commit_paths(self, message: str, paths: list[str]) -> str:
+        """Commit only ``paths``; anything else already staged stays staged and uncommitted."""
         existing = [p for p in paths if (self.root / p).exists() or self.tracked_at("HEAD", p)]
         if not existing:
             return self.head()
         self.run("add", "-A", "--", *existing)
-        if not self.run("diff", "--cached", "--name-only").strip():
+        if not self.run("diff", "--cached", "--name-only", "--", *existing).strip():
             return self.head()
-        self.run("commit", "-q", "--no-verify", "-m", message)
+        self.run("commit", "-q", "--no-verify", "--only", "-m", message, "--", *existing)
         return self.head()
 
     def checkout_paths(self, ref: str, paths: list[str]) -> None:

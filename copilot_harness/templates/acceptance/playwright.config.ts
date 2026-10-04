@@ -8,6 +8,7 @@
  *  - fixed locale/timezone/viewport/colour scheme/reduced motion
  *  - the app is always started fresh by Playwright (webServer), on APP_PORT when set
  *  - retired tests (harness/test_plan.json status "retired") are excluded via grepInvert
+ *  - tests reach only the app: every other host goes to a closed local port and fails
  */
 import { randomBytes } from 'node:crypto';
 import { defineConfig, devices } from '@playwright/test';
@@ -18,6 +19,10 @@ process.env.HARNESS_RUN_ID ??= randomBytes(4).toString('hex');
 const baseURL = appBaseURL();
 const url = new URL(baseURL);
 const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+// Applies to the browser and to the `request` fixture. `<-loopback>` drops Chromium's implicit
+// loopback bypass, so only the app's host is reached directly: no CDNs or third-party services,
+// and no exfiltration from a frozen test.
+const appOnly = { server: 'http://127.0.0.1:9', bypass: ['<-loopback>', ...new Set(['localhost', '127.0.0.1', '[::1]', url.hostname])].join(',') };
 
 export default defineConfig({
   testDir: './specs',
@@ -37,6 +42,7 @@ export default defineConfig({
   ],
   use: {
     baseURL,
+    proxy: appOnly,
     locale: 'en-US',
     timezoneId: 'UTC',
     colorScheme: 'light',

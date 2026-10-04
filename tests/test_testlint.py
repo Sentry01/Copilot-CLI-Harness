@@ -108,3 +108,40 @@ test('SEC-001: wrong folder', async () => { expect(1 + 1).toBe(2); });
     assert ("SEC-001", "security tests belong under specs/security/") in msgs
     assert any(tid == "FUNC-001" and m.startswith("duplicate") for tid, m in msgs)
     assert ("FUNC-002", "planned test is not implemented") in msgs
+
+
+def test_requests_leave_the_app_only_as_payload_data():
+    src = """import { test, expect } from '../../support';
+test('SEC-001: a', async ({ page, request, playwright }) => {
+  await page.goto('/login?next=https://evil.example/');
+  await request.get(`/search?q=${encodeURIComponent('<a href="https://x.example">')}`);
+  await page.goto('https://evil.example/');
+  await request.post("//evil.example/collect", { data: {} });
+  await request.get(`http://127.0.0.1:3000/api`);
+  await fetch('https://evil.example');
+  await playwright.request.newContext({ baseURL: 'https://evil.example' });
+  expect(1 + 1).toBe(2);
+});
+"""
+    _, issues = lint_source(src, "acceptance/specs/security/x.spec.ts")
+    destination = [i.line for i in issues if i.severity == "error" and "relative paths" in i.message]
+    assert destination == [5, 6, 7, 8, 9]
+    assert {i.line for i in issues if i.severity == "warning"} >= {3, 4}  # payloads: reported, not blocking
+
+
+def test_specs_import_only_from_the_kit():
+    src = """import { test, expect } from '../../support';
+import type { Page } from '@playwright/test';
+import { request as raw } from '@playwright/test';
+import * as http from 'node:http';
+import 'node:child_process';
+test('FUNC-001: a', async () => {
+  const fs = await import('node:fs');
+  const https = require('https');
+  expect(fs && https).toBeTruthy();
+});
+"""
+    msgs = errors(src)
+    rejected = sorted(m.split("'")[1] for m in msgs if m.startswith("import from"))
+    assert rejected == ["@playwright/test", "node:child_process", "node:http"]  # the type-only import is fine
+    assert sum("require()/dynamic import()" in m for m in msgs) == 2

@@ -139,9 +139,10 @@ function ratchet(ref, { lock, baseline, retiredNow, plan, planned, failures }) {
     const now = planned.get(t.id);
     if (!now) { failures.push(`planned test ${t.id} was removed`); continue; }
     if (stable(t, ['status']) !== stable(now, ['status'])) failures.push(`planned test ${t.id} was edited (the plan is append-only)`);
+    // Same rule as the plan validator: only a superseded requirement can retire a test.
     if ((t.status ?? 'active') === 'active' && now.status === 'retired') {
-      const live = (now.req_ids ?? []).filter((rid) => (reqsNow.get(rid)?.status ?? 'active') === 'active');
-      if (live.length) failures.push(`planned test ${t.id} was retired but its requirements are still active: ${live.join(', ')}`);
+      const superseded = (now.req_ids ?? []).filter((rid) => reqsNow.has(rid) && (reqsNow.get(rid).status ?? 'active') !== 'active');
+      if (!superseded.length) failures.push(`planned test ${t.id} was retired but none of its requirements were superseded: ${(now.req_ids ?? []).join(', ')}`);
     }
   }
   for (const r of baseReqs?.requirements ?? []) {

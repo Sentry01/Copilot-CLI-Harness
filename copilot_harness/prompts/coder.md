@@ -35,6 +35,8 @@ $adjudications
   check authorisation on every resource, hash passwords (bcrypt/argon2/scrypt), set secure
   cookie flags, return JSON errors without stack traces, and handle empty, loading and error
   states in the UI.
+- Serve every asset (scripts, styles, fonts, images) from the app. The test runner blocks all
+  other hosts, so CDN or third-party resources won't load in tests.
 - If, and only if, a test contradicts the PRD, the contract, or itself, file a dispute instead
   of working around it. Write `.harness/disputes/claims/<TEST-ID>.json` as
   `{"test_id": "...", "claim": "why the test is wrong", "evidence": "PRD/contract quotes, failure output"}`.
