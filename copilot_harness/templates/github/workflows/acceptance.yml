@@ -60,6 +60,7 @@ jobs:
           --report acceptance/reports/report.json
           --summary "$GITHUB_STEP_SUMMARY"
           ${{ github.event_name == 'pull_request' && format('--base-ref origin/{0}', github.base_ref) || '' }}
+          ${{ github.event_name == 'push' && github.event.before != '0000000000000000000000000000000000000000' && format('--base-ref {0}', github.event.before) || '' }}
 
       - uses: actions/upload-artifact@v7
         if: always()

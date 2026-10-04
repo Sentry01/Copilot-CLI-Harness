@@ -87,8 +87,11 @@ export async function measureConcurrentLatency(
       const t0 = performance.now();
       const res = await api.fetch(req.path, { method: req.method ?? 'GET', data: req.data, headers: req.headers });
       await res.body();
-      expect(res.status() < 500, `${req.path} returned ${res.status()} under load`).toBe(true);
-      return performance.now() - t0;
+      const elapsed = performance.now() - t0;
+      // Same rule as measureLatency: fast error responses must not count as served requests.
+      if (req.status !== undefined) expect(res.status(), `${req.method ?? 'GET'} ${req.path} under load`).toBe(req.status);
+      else expect(res.ok(), `${req.method ?? 'GET'} ${req.path} returned ${res.status()} under load`).toBe(true);
+      return elapsed;
     });
     out.push(...(await Promise.all(batch)));
   }
@@ -141,12 +144,15 @@ export async function measurePageLoad(
   const runs: PageTiming[] = [];
   for (let i = 0; i < (opts.warmup ?? 1) + (opts.samples ?? 5); i++) {
     await page.goto(path, { waitUntil: 'load' });
-    // On fast pages `load` fires before the first paint; wait for it (no FCP = blank page).
+    // On fast pages `load` fires before the first paint, so wait for it. A page that never paints
+    // contentful content must fail rather than report zero timings.
     await page
       .waitForFunction(() => performance.getEntriesByName('first-contentful-paint').length > 0, undefined, {
         timeout: 10_000,
       })
-      .catch(() => {});
+      .catch(() => {
+        throw new Error(`${path} never rendered contentful content (no first-contentful-paint within 10s)`);
+      });
     const t = await page.evaluate(async () => {
       // Let pending LCP / layout-shift observer callbacks run.
       await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r(null))));

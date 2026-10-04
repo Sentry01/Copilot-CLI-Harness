@@ -36,6 +36,13 @@ def test_playwright_json_aggregation():
     assert r.unidentified == ["untagged test"]
 
 
+def test_skipped_repetitions_are_never_a_pass():
+    spec = {"title": "FUNC-001: x", "tests": [{"results": [{"status": "passed"}]}, {"results": [{"status": "skipped"}]},
+                                              {"results": []}]}
+    o = parse_playwright_json({"suites": [{"specs": [spec]}]}).outcomes["FUNC-001"]
+    assert o.status == "skipped" and o.runs == 3 and o.passes == 1
+
+
 def test_collection_errors_and_test_bug_detection():
     r = parse_playwright_json({"errors": [{"message": "SyntaxError: Unexpected token"}], "suites": []})
     assert r.collection_errors and not r.outcomes

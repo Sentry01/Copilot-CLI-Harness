@@ -12,8 +12,8 @@ import sys
 
 from copilot_harness import __version__
 from copilot_harness.config import load_config
-from copilot_harness.lock import verify_lock
-from copilot_harness.models import State, load_model, write_json
+from copilot_harness.lock import create_lock, verify_lock
+from copilot_harness.models import KitChange, State, load_model, write_json
 from copilot_harness.orchestrator import PHASES, Harness, Stop
 from copilot_harness.paths import ProjectPaths
 from copilot_harness.project import ProjectError, create_project, start_feature
@@ -61,6 +61,10 @@ def _parser() -> argparse.ArgumentParser:
     s = sub.add_parser("approve", help="approve the current test plan (after --pause-after-plan)")
     s.add_argument("dir")
     s.add_argument("--allow-retire", action="store_true", help="accept retiring baseline tests in the active change")
+
+    s = sub.add_parser("relock", help="authorize deliberate changes to frozen kit/config/CI files")
+    s.add_argument("dir")
+    s.add_argument("--reason", required=True, help="why the frozen kit changed (recorded in the lock)")
 
     s = sub.add_parser("report", help="write harness/REPORT.md")
     s.add_argument("dir")
@@ -120,6 +124,8 @@ async def _dispatch(args: argparse.Namespace) -> int:
             return 0
         case "lint":
             return _lint(ProjectPaths.at(args.dir))
+        case "relock":
+            return relock_kit(ProjectPaths.at(args.dir), args.reason)
         case "models":
             from copilot_harness.backends.sdk import list_models
 
@@ -168,39 +174,84 @@ def _status(paths: ProjectPaths) -> int:
 
 
 async def _verify(args: argparse.Namespace) -> int:
-    paths = ProjectPaths.at(args.dir)
-    h = Harness(paths.root)
+    return await verify_project(Harness(ProjectPaths.at(args.dir).root), promote=args.promote)
+
+
+async def verify_project(h: Harness, promote: bool = False, out=print) -> int:
+    """Run the suite without agents; exit 1 on regressions or lock drift. Promotion is refused unless the
+    frozen suite is intact and the working tree is committed, so it can never bless altered tests or code."""
+    paths = h.paths
     plan, lock = h.plan(), h.lock()
     if plan is None or lock is None:
-        print("error: no frozen suite yet", file=sys.stderr)
+        out("error: no frozen suite yet")
         return 2
     code = 0
     drift = verify_lock(paths, lock)
+    lock_intact = drift.ok
     if not drift.ok and not h.state.active_change:
-        print("✗ frozen suite drifted:\n  " + "\n  ".join(drift.describe()))
+        out("✗ frozen suite drifted:\n  " + "\n  ".join(drift.describe()))
         code = 1
     result = await h.verify("verify")
     if result.infra_error or result.report.collection_errors:
-        print("✗ suite could not run:\n" + (result.infra_error or "\n".join(result.report.collection_errors))[:3000])
+        out("✗ suite could not run:\n" + (result.infra_error or "\n".join(result.report.collection_errors))[:3000])
         return 1
     baseline = h.baseline()
     regressions = h.regressions(result, baseline)
     active = {t.id for t in plan.active()}
     passing = result.report.passed & active
-    print(f"passing {len(passing)}/{len(active)}; baseline {len(baseline.tests)}; regressions {len(regressions)}")
+    out(f"passing {len(passing)}/{len(active)}; baseline {len(baseline.tests)}; regressions {len(regressions)}")
     for tid in regressions:
         o = result.report.outcomes.get(tid)
-        print(f"  ✗ REGRESSION {tid}: {(o.error.splitlines() or [''])[0][:160] if o else 'did not run'}")
+        out(f"  ✗ REGRESSION {tid}: {(o.error.splitlines() or [''])[0][:160] if o else 'did not run'}")
     if regressions:
         code = 1
-    elif args.promote:
-        stable = await h.promote(passing - set(baseline.tests))
-        if stable:
-            h.state.last_green_commit = h.commit(f"harness: baseline +{len(stable)} (verify --promote)")
-        print(f"promoted {len(stable)} tests")
+    elif promote:
+        dirty = [e.path for e in h.git.status() if not e.path.startswith(".harness/")]
+        if not lock_intact or h.state.active_change:
+            out("✗ not promoting: the frozen suite is not intact (or a change is in progress)")
+            code = 1
+        elif dirty:
+            out(f"✗ not promoting: commit or stash your changes first ({', '.join(dirty[:5])})")
+            code = 1
+        else:
+            stable = await h.promote(passing - set(baseline.tests))
+            if stable:
+                h.state.last_green_commit = h.git.commit_paths(
+                    f"harness: baseline +{len(stable)} (verify --promote)", ["harness/baseline.json"])
+            out(f"promoted {len(stable)} tests")
     h.save_state()
     write_report(paths, h.current_phase())
     return code
+
+
+def relock_kit(paths: ProjectPaths, reason: str, out=print) -> int:
+    """Authorize deliberate changes to frozen non-spec files (support kit, config, scripts, CI workflows).
+
+    Spec changes must go through disputes; requirement/plan/contract changes through `feature`."""
+    h = Harness(paths.root)
+    lock = h.lock()
+    if lock is None:
+        out("error: no frozen suite yet")
+        return 2
+    if h.state.active_change:
+        out(f"error: change {h.state.active_change} is in progress; finish it with `copilot-harness run` first")
+        return 2
+    drift = verify_lock(paths, lock)
+    changed = sorted(drift.modified + drift.missing + drift.added)
+    if not changed:
+        out("lock is intact; nothing to relock")
+        return 0
+    refused = [p for p in changed if p.startswith(("acceptance/specs/", "harness/"))]
+    if refused:
+        out("error: these frozen files cannot be relocked by hand (specs change through disputes, "
+            "requirements/plan/contract through `feature`):\n  " + "\n  ".join(refused))
+        return 2
+    new_lock = create_lock(paths, lock.test_ids, previous=lock,
+                           kit_changes=[KitChange(path=p, reason=reason) for p in changed])
+    write_json(paths.lock, new_lock)
+    h.git.commit_paths(f"harness: relock kit ({reason})", [*changed, "harness/tests.lock.json"])
+    out(f"✓ relocked v{new_lock.version}: " + ", ".join(changed))
+    return 0
 
 
 def _lint(paths: ProjectPaths) -> int:

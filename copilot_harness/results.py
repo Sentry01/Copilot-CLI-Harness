@@ -67,20 +67,20 @@ def _aggregate(raw: dict[str, list[tuple[str, float, str]]], files: dict[str, st
     for tid, results in raw.items():
         statuses = [s for s, _, _ in results]
         passes = statuses.count("passed")
-        ran = [s for s in statuses if s != "skipped"]
-        if not ran:
-            status: Outcome = "skipped"
-        elif passes == len(ran):
-            status = "passed"
-        elif passes == 0:
+        failures = statuses.count("failed")
+        if passes == len(statuses):
+            status: Outcome = "passed"
+        elif failures and passes:
+            status = "flaky"
+        elif failures:
             status = "failed"
         else:
-            status = "flaky"
+            status = "skipped"  # all, or some, repetitions did not execute: never a pass
         error = next((e for s, _, e in results if s != "passed" and e), "")
         out[tid] = TestOutcome(
             id=tid,
             status=status,
-            runs=len(ran),
+            runs=len(statuses),
             passes=passes,
             duration_ms=sum(d for _, d, _ in results),
             error=strip_ansi(error)[:4000],

@@ -35,6 +35,9 @@ http.createServer((req, res) => {
       return send(200, { ok: true }, 'application/json', { 'Set-Cookie': 'sid=abc; HttpOnly; SameSite=Lax; Path=/' });
     case 'POST /weak-login': return send(200, { ok: true }, 'application/json', { 'Set-Cookie': 'sid=abc; Path=/' });
     case 'GET /leaky': return send(500, 'TypeError: x is undefined\n    at handler (/srv/app/node_modules/x/index.js:10:5)', 'text/plain');
+    case 'GET /frame-star': return send(200, 'ok', 'text/plain', { 'Content-Security-Policy': "default-src 'self'; frame-ancestors *" });
+    case 'POST /bogus-samesite-login': return send(200, { ok: true }, 'application/json', { 'Set-Cookie': 'sid=abc; HttpOnly; SameSite=bogus; Path=/' });
+    case 'GET /blank': return send(200, '<!doctype html><html lang="en"><head><title>blank</title></head><body></body></html>', 'text/html');
     case 'GET /naked':
       res.writeHead(200, { 'Content-Type': 'text/plain', 'X-Powered-By': 'Express 4.1' });
       return res.end('no headers');

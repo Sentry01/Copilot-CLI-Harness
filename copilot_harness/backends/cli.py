@@ -10,7 +10,9 @@ from __future__ import annotations
 
 import json
 import shutil
+import time
 import uuid
+from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
@@ -25,8 +27,8 @@ GIT_WRITE_SUBCOMMANDS = (
 )
 
 
-def deny_rules(allow_git_push: bool) -> list[str]:
-    rules = [f"shell({c})" for c in sorted(DENIED_COMMANDS)]
+def deny_rules(allow_git_push: bool, denied_commands: Iterable[str] = DENIED_COMMANDS) -> list[str]:
+    rules = [f"shell({c})" for c in sorted(denied_commands)]
     rules += [f"shell({base} {sub})" for base, subs in sorted(DENIED_SUBCOMMANDS.items()) for sub in sorted(subs)]
     for sub in GIT_WRITE_SUBCOMMANDS:
         if sub in GIT_READ_ONLY or (sub == "push" and allow_git_push):
@@ -65,7 +67,7 @@ class CliBackend(AgentBackend):
             args += ["--max-ai-credits", str(spec.max_ai_credits)]
         for host in ("http://localhost", "http://127.0.0.1", *spec.policy.allow_urls):
             args.append(f"--allow-url={host}")
-        for rule in deny_rules(self.allow_git_push):
+        for rule in deny_rules(self.allow_git_push, spec.policy.denied_commands):
             args.append(f"--deny-tool={rule}")
         if spec.mcp_servers:
             mcp_file = log_dir / "mcp.json"
@@ -83,9 +85,14 @@ class CliBackend(AgentBackend):
         prompt_file.write_text(f"{spec.instructions}\n\n---\n\n{spec.prompt}", encoding="utf-8")
         message = f"Read {prompt_file} and follow its instructions exactly; it is your complete task."
         base = self._args(spec, log_dir)
-        remaining = spec.timeout_s
+        deadline = time.monotonic() + spec.timeout_s
         turn = 0
         while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                outcome.ok, outcome.timed_out = False, True
+                outcome.error = f"session exceeded {spec.timeout_s / 60:.0f} minutes and was stopped"
+                break
             argv = base + ([f"--session-id={session_id}"] if turn == 0 else [f"--resume={session_id}"]) + ["-p", message]
             log.write("cli_invoke", turn=turn)
             code, out, timed_out = await run_command(argv, spec.working_directory, None, remaining, log_dir / "cli-output.log")
@@ -108,7 +115,6 @@ class CliBackend(AgentBackend):
             cont = log_dir / f"continue-{turn}.md"
             cont.write_text(reason, encoding="utf-8")
             message = f"You are not done. Read {cont} for what still fails, fix it, then stop."
-            remaining = max(60.0, remaining - 60)
         outcome.credits = _credits_from_usage(log_dir / "usage.json")
         return outcome
 

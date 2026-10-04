@@ -119,3 +119,32 @@ def test_git_push_can_be_enabled():
 def test_extra_allowed_commands_override_denylist():
     p = Policy(root="/home/dev/proj", role="coder", extra_allowed_commands=["docker"])
     assert p.check_shell([C("docker", False)], "docker compose up").allow
+
+
+def test_symlinks_cannot_escape_the_write_scope(tmp_path):
+    root = tmp_path / "proj"
+    (root / "app").mkdir(parents=True)
+    (root / ".git").mkdir()
+    (root / "app" / "link").symlink_to(Path.home())  # outside the project and outside the temp dir
+    (root / "app" / "git-link").symlink_to(root / ".git", target_is_directory=True)
+    (root / "app" / "tests-link").symlink_to(root / "acceptance", target_is_directory=True)
+    p = Policy(root=root, role="coder")
+    assert not p.check_write("app/link/.bashrc").allow
+    assert not p.check_write("app/git-link/hooks/pre-commit").allow
+    assert not p.check_write("app/tests-link/specs/functional/a.spec.ts").allow
+    assert not p.check_shell([C("cp", False)], "cp x app/link/y", ["app/link/y"]).allow
+    assert p.check_write("app/real.js").allow
+
+
+def test_mcp_browser_navigation_is_restricted_to_allowed_hosts(coder):
+    assert coder.check_mcp("playwright", "browser_navigate", {"url": "http://127.0.0.1:4000/"}).allow
+    assert not coder.check_mcp("playwright", "browser_navigate", {"url": "https://exfil.example/?d=x"}).allow
+    assert not coder.check_mcp("playwright", "browser_navigate", {"url": "file:///etc/passwd"}).allow
+    assert not coder.check_mcp("playwright", "browser_tabs", {"action": "new", "nested": ["https://evil.io"]}).allow
+    assert coder.check_mcp("playwright", "browser_click", {"element": "Add note", "ref": "e12"}).allow
+
+
+def test_effective_denylist_includes_configured_commands():
+    p = Policy(root="/home/dev/proj", role="coder", extra_denied_commands=["python"], extra_allowed_commands=["docker"])
+    assert "python" in p.denied_commands and "docker" not in p.denied_commands
+    assert not p.check_shell([C("python", False)], "python x.py").allow

@@ -97,3 +97,19 @@ def test_plan_rejects_tests_on_superseded_requirements(tmp_path, cfg):
     reqs = RequirementsDoc.model_validate(reqs_data)
     _, issues = validate_test_plan(write(tmp_path, "p.json", PLAN), reqs, cfg)
     assert any("SEC-001 is active but traces to superseded requirement REQ-002" in i for i in issues)
+
+
+def test_delta_cannot_retire_all_tests_of_an_active_requirement(tmp_path, cfg):
+    reqs_data = copy.deepcopy(REQUIREMENTS)
+    reqs_data["requirements"].append({"id": "REQ-005", "title": "Delete", "type": "functional", "priority": "P1",
+                                      "description": "desc", "acceptance_criteria": ["a"], "origin": "CHG-001"})
+    reqs = RequirementsDoc.model_validate(reqs_data)
+    previous = TestPlan.model_validate(PLAN)
+    plan = copy.deepcopy(PLAN)
+    for t in plan["tests"]:
+        if t["id"] == "SEC-001":
+            t["status"] = "retired"  # REQ-002 is still active
+    plan["tests"].append({"id": "FUNC-004", "title": "deletes", "category": "functional", "group": "del",
+                          "priority": "P1", "req_ids": ["REQ-005"], "steps": ["s"], "expected": ["e"], "origin": "CHG-001"})
+    _, issues = validate_test_plan(write(tmp_path, "p.json", plan), reqs, cfg, previous, "CHG-001")
+    assert any("REQ-002 (Security headers) has no tests" in i for i in issues)

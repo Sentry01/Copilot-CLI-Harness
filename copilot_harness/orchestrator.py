@@ -242,7 +242,8 @@ class Harness:
             "playwright": {
                 "type": "local",
                 "command": "npx",
-                "args": ["-y", self.cfg.security.playwright_mcp_package, "--headless", "--isolated"],
+                "args": ["-y", self.cfg.security.playwright_mcp_package, "--headless", "--isolated",
+                         "--allowed-origins", "http://localhost:*;http://127.0.0.1:*"],
                 "tools": ["*"],
             }
         }

@@ -189,7 +189,7 @@ def validate_test_plan(
     else:
         issues += _check_append_only_plan(previous, plan, cfg, delta_origin)
 
-    issues += coverage_issues(requirements, plan, only_origin=delta_origin)
+    issues += coverage_issues(requirements, plan)
     return (plan if not issues else None), issues[:MAX_ISSUES]
 
 

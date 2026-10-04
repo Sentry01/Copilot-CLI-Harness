@@ -193,6 +193,14 @@ class Amendment(_Strict):
     decided_at: str = Field(default_factory=utcnow)
 
 
+class KitChange(_Strict):
+    """A deliberate, human-authorized change to a frozen non-spec file (`copilot-harness relock`)."""
+
+    path: str
+    reason: str
+    decided_at: str = Field(default_factory=utcnow)
+
+
 class TestLock(_Strict):
     """SHA-256 manifest of the frozen suite. Any drift is a violation."""
 
@@ -203,6 +211,7 @@ class TestLock(_Strict):
     files: dict[str, str]
     test_ids: list[str]
     amendments: list[Amendment] = Field(default_factory=list)
+    kit_changes: list[KitChange] = Field(default_factory=list)
 
 
 class BaselineEntry(_Strict):

@@ -65,6 +65,17 @@ test.describe('detects defects', () => {
   test.fail('budget helper', async () => { expectWithinBudget(120, 100, 'x'); });
   test.fail('missing security headers', async ({ request }) => { expectSecurityHeaders(await request.get('/naked')); });
   test.fail('weak cookie', async ({ request }) => { expectSecureCookies(await request.post('/weak-login')); });
+  test.fail('invalid SameSite value', async ({ request }) => { expectSecureCookies(await request.post('/bogus-samesite-login')); });
+  test.fail('permissive frame-ancestors', async ({ request }) => {
+    const res = await request.get('/frame-star');
+    expectSecurityHeaders(res, { csp: false });
+  });
+  test.fail('fast errors under load are not served requests', async ({ request }) => {
+    await measureConcurrentLatency(request, { path: '/api/private' }, { concurrency: 3, rounds: 1 });
+  });
+  test.fail('a page that never paints', async ({ page }) => {
+    await measurePageLoad(page, '/blank', { samples: 1, warmup: 0 });
+  });
   test.fail('reflected XSS', async ({ page }) => {
     await installXssTrap(page);
     await page.goto(`/unsafe-search?q=${encodeURIComponent(XSS_PAYLOADS[1])}`);

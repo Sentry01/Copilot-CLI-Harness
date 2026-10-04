@@ -25,6 +25,7 @@ import tempfile
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 from urllib.parse import urlparse
 
 ROLE_WRITE_SCOPES: dict[str, tuple[str, ...]] = {
@@ -133,6 +134,11 @@ class Policy:
         self._temp_roots = tuple(sorted(temps))
         self._denied = (DENIED_COMMANDS | set(self.extra_denied_commands)) - set(self.extra_allowed_commands)
 
+    @property
+    def denied_commands(self) -> frozenset[str]:
+        """Effective command denylist (defaults + configured denials - configured allowances)."""
+        return frozenset(self._denied)
+
     # ------------------------------------------------------------------
     # paths
     # ------------------------------------------------------------------
@@ -141,10 +147,11 @@ class Policy:
         return (*ROLE_WRITE_SCOPES.get(self.role, ()), *self.extra_write_scope, *ALWAYS_WRITABLE)
 
     def resolve(self, path: str, cwd: str | None = None) -> Path:
+        """Absolute path with symlinks resolved, so a link inside a writable scope cannot reach outside it."""
         p = Path(os.path.expanduser(path))
         if not p.is_absolute():
             p = Path(cwd or self.root) / p
-        return Path(os.path.normpath(p))
+        return Path(os.path.realpath(p))
 
     def relative(self, p: Path) -> str | None:
         try:
@@ -202,10 +209,17 @@ class Policy:
     # ------------------------------------------------------------------
     # MCP
     # ------------------------------------------------------------------
-    def check_mcp(self, server: str, tool: str) -> Decision:
-        if server in set(self.mcp_servers):
-            return Decision.ok()
-        return Decision.deny(f"MCP server {server!r} (tool {tool}) is not enabled for harness sessions")
+    def check_mcp(self, server: str, tool: str, args: Any = None) -> Decision:
+        if server not in set(self.mcp_servers):
+            return Decision.deny(f"MCP server {server!r} (tool {tool}) is not enabled for harness sessions")
+        # Browser tools must stay on the app under test / allowed hosts (e.g. browser_navigate).
+        for url in _urls_in(args):
+            if not url.lower().startswith(("http://", "https://")) and "://" in url:
+                return Decision.deny(f"MCP tool {tool} may not open {url.split('://', 1)[0]}:// URLs")
+            d = self.check_url(url)
+            if not d.allow:
+                return d
+        return Decision.ok()
 
     # ------------------------------------------------------------------
     # shell
@@ -289,6 +303,24 @@ class Policy:
                 if not d.allow:
                     return d
         return Decision.ok()
+
+
+def _urls_in(args: Any) -> list[str]:
+    """URL-like strings in MCP tool arguments: any `url` field, and any value containing '://'."""
+    found: list[str] = []
+
+    def walk(value: Any, key: str = "") -> None:
+        if isinstance(value, dict):
+            for k, v in value.items():
+                walk(v, str(k))
+        elif isinstance(value, (list, tuple)):
+            for v in value:
+                walk(v, key)
+        elif isinstance(value, str) and (key.lower() == "url" or "://" in value):
+            found.append(value.strip())
+
+    walk(args)
+    return found
 
 
 _GIT_GLOBAL_OPTS_WITH_ARG = {"-C", "-c", "--git-dir", "--work-tree", "--namespace"}

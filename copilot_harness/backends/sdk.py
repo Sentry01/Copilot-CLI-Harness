@@ -58,7 +58,7 @@ def decide(policy: Policy, request: Any) -> Decision:
     if isinstance(request, ev.PermissionRequestUrl):
         return policy.check_url(request.url)
     if isinstance(request, ev.PermissionRequestMcp):
-        return policy.check_mcp(request.server_name, request.tool_name)
+        return policy.check_mcp(request.server_name, request.tool_name, request.args)
     if isinstance(request, ev.PermissionRequestCustomTool):
         return Decision.ok()
     if isinstance(request, ev.PermissionRequestMemory):

@@ -71,3 +71,34 @@ def test_credits_from_usage(tmp_path: Path):
     f.write_text(json.dumps({"models": [{"totalNanoAiu": 2_500_000_000}, {"totalNanoAiu": 500_000_000}]}))
     assert _credits_from_usage(f) == pytest.approx(3.0)
     assert _credits_from_usage(tmp_path / "missing.json") == 0.0
+
+
+def test_cli_deny_rules_follow_the_effective_policy(tmp_path: Path):
+    pol = Policy(root=tmp_path, role="coder", extra_denied_commands=["python"], extra_allowed_commands=["docker"])
+    spec = SessionSpec(role="coder", prompt="p", instructions="i", policy=pol, working_directory=tmp_path)
+    args = CliBackend(cli_path="copilot")._args(spec, tmp_path)
+    assert "--deny-tool=shell(python)" in args
+    assert "--deny-tool=shell(docker)" not in args
+
+
+def test_cli_session_deadline_covers_continuations(tmp_path: Path):
+    import asyncio
+    import time
+
+    fake = tmp_path / "copilot"
+    fake.write_text("#!/bin/sh\nsleep 1\necho '{\"type\":\"assistant.message\",\"data\":{\"content\":\"working\"}}'\n")
+    fake.chmod(0o755)
+    checks = []
+
+    async def never_done():
+        checks.append(1)
+        return "still failing"
+
+    spec = SessionSpec(role="coder", prompt="p", instructions="i", policy=Policy(root=tmp_path, role="coder"),
+                       working_directory=tmp_path, timeout_s=2.5, stop_check=never_done, max_stop_blocks=50,
+                       log_dir=tmp_path / "log")
+    started = time.monotonic()
+    outcome = asyncio.run(CliBackend(cli_path=str(fake), verbose=False).run(spec))
+    assert time.monotonic() - started < 6  # bounded by the deadline, not by 50 continuations
+    assert outcome.timed_out and not outcome.ok
+    assert len(checks) < 5

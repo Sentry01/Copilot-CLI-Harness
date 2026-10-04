@@ -58,6 +58,7 @@ whatever the committed artifacts say is next.
 | `verify DIR [--promote]` | Run the suite without agents; exit 1 on a regression or lock drift. `--promote` adds stable passes to the baseline |
 | `feature DIR --prd-delta FILE [--allow-retire]` | Start a feature change. `run` builds it test-first |
 | `approve DIR [--allow-retire]` | Approve the plan after `--pause-after-plan` |
+| `relock DIR --reason TEXT` | Authorize a deliberate change to frozen kit/config/CI files (recorded in the lock; CI requires it). Specs change only via disputes |
 | `report DIR` | Write `harness/REPORT.md`: requirement traceability matrix, category coverage, blockers, sessions |
 | `lint DIR` | Static checks of specs against the plan |
 | `models` | List models available to your Copilot account |
@@ -112,8 +113,9 @@ Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 fails if:
 - any **baseline** test fails, is flaky, or didn't run (regression);
 - frozen files differ from `harness/tests.lock.json` (tampering);
-- the PR removes baseline or planned tests, edits existing plan or requirement entries, or
-  changes a frozen spec without a recorded amendment;
+- the change (PR, or push compared with the previous commit) removes baseline or planned tests,
+  edits existing plan/requirement entries, removes contract entries, rewrites the PRD, changes a
+  frozen spec without a recorded amendment, or changes the frozen kit/config without `relock`;
 - the suite fails to load, or contains tests that aren't in the plan.
 
 Backlog tests (planned, not yet implemented) may fail without failing CI. Use `gate.mjs

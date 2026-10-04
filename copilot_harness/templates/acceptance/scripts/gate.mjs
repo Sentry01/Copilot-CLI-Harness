@@ -66,11 +66,25 @@ function lockedFiles() {
   return [...files].sort();
 }
 
-function gitShowJson(ref, rel) {
+function gitShowText(ref, rel) {
   try {
-    return JSON.parse(execFileSync('git', ['-C', ROOT, 'show', `${ref}:${rel}`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }));
+    return execFileSync('git', ['-C', ROOT, 'show', `${ref}:${rel}`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
   } catch {
     return null;
+  }
+}
+
+function gitShowJson(ref, rel) {
+  const text = gitShowText(ref, rel);
+  return text === null ? null : JSON.parse(text);
+}
+
+function refResolves(ref) {
+  try {
+    execFileSync('git', ['-C', ROOT, 'rev-parse', '--verify', '--quiet', `${ref}^{commit}`], { stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
   }
 }
 
@@ -100,11 +114,84 @@ function aggregate(report) {
   for (const s of report.suites ?? []) visit(s);
   const outcomes = new Map();
   for (const [id, list] of raw) {
-    const ran = list.filter((s) => s !== 'skipped');
-    const passes = ran.filter((s) => s === 'passed').length;
-    outcomes.set(id, !ran.length ? 'skipped' : passes === ran.length ? 'passed' : passes === 0 ? 'failed' : 'flaky');
+    const passes = list.filter((s) => s === 'passed').length;
+    const failures = list.filter((s) => s === 'failed').length;
+    // A skipped repetition is never a pass: all runs must execute and pass.
+    outcomes.set(id, passes === list.length ? 'passed' : failures && passes ? 'flaky' : failures ? 'failed' : 'skipped');
   }
   return { outcomes, unidentified, errors: (report.errors ?? []).map((e) => (e.message ?? String(e)).slice(0, 500)) };
+}
+
+const HARNESS_RECORDS = new Set(['harness/requirements.json', 'harness/test_plan.json', 'harness/contract.json', 'harness/PRD.md']);
+
+/** Compare the PR head against the base branch: nothing frozen may be weakened or removed. */
+function ratchet(ref, { lock, baseline, retiredNow, plan, planned, failures }) {
+  const basePlan = gitShowJson(ref, 'harness/test_plan.json');
+  const baseReqs = gitShowJson(ref, 'harness/requirements.json');
+  const baseBaseline = gitShowJson(ref, 'harness/baseline.json');
+  const baseLock = gitShowJson(ref, 'harness/tests.lock.json');
+  const reqsNow = new Map((readJson('harness/requirements.json', { requirements: [] }).requirements).map((r) => [r.id, r]));
+
+  for (const id of Object.keys(baseBaseline?.tests ?? {})) {
+    if (!(id in baseline) && !(id in retiredNow)) failures.push(`baseline test ${id} was removed (only retirement through a PRD change is allowed)`);
+  }
+  for (const t of basePlan?.tests ?? []) {
+    const now = planned.get(t.id);
+    if (!now) { failures.push(`planned test ${t.id} was removed`); continue; }
+    if (stable(t, ['status']) !== stable(now, ['status'])) failures.push(`planned test ${t.id} was edited (the plan is append-only)`);
+    if ((t.status ?? 'active') === 'active' && now.status === 'retired') {
+      const live = (now.req_ids ?? []).filter((rid) => (reqsNow.get(rid)?.status ?? 'active') === 'active');
+      if (live.length) failures.push(`planned test ${t.id} was retired but its requirements are still active: ${live.join(', ')}`);
+    }
+  }
+  for (const r of baseReqs?.requirements ?? []) {
+    const now = reqsNow.get(r.id);
+    if (!now) failures.push(`requirement ${r.id} was removed`);
+    else if (stable(r, ['status', 'superseded_by']) !== stable(now, ['status', 'superseded_by'])) failures.push(`requirement ${r.id} was edited`);
+  }
+  const baseContract = gitShowJson(ref, 'harness/contract.json');
+  if (baseContract) {
+    const now = readJson('harness/contract.json', {});
+    const api = new Set((now.api ?? []).map((e) => `${e.method} ${e.path}`));
+    for (const e of baseContract.api ?? []) if (!api.has(`${e.method} ${e.path}`)) failures.push(`contract endpoint ${e.method} ${e.path} was removed`);
+    const routes = new Set((now.ui?.routes ?? []).map((r) => r.path));
+    for (const r of baseContract.ui?.routes ?? []) if (!routes.has(r.path)) failures.push(`contract route ${r.path} was removed`);
+    for (const id of Object.keys(baseContract.ui?.testids ?? {})) if (!(id in (now.ui?.testids ?? {}))) failures.push(`contract test id ${id} was removed`);
+  }
+  const basePrd = gitShowText(ref, 'harness/PRD.md');
+  if (basePrd !== null) {
+    const prd = existsSync(join(ROOT, 'harness/PRD.md')) ? readFileSync(join(ROOT, 'harness/PRD.md'), 'utf8') : '';
+    if (!prd.startsWith(basePrd.trimEnd())) failures.push('harness/PRD.md was edited (changes are appended through `copilot-harness feature`)');
+  }
+  if (!baseLock || !lock) return;
+
+  const seen = (list) => new Set((list ?? []).map((a) => `${a.test_id ?? a.path}|${a.decided_at}`));
+  const baseAmend = seen(baseLock.amendments);
+  const amendedFiles = new Set((lock.amendments ?? []).filter((a) => !baseAmend.has(`${a.test_id}|${a.decided_at}`)).map((a) => {
+    const t = planned.get(a.test_id);
+    return t ? `acceptance/specs/${t.category}/${t.group}.spec.ts` : '';
+  }));
+  const baseKit = seen(baseLock.kit_changes);
+  const authorizedKit = new Set((lock.kit_changes ?? []).filter((k) => !baseKit.has(`${k.path}|${k.decided_at}`)).map((k) => k.path));
+
+  const paths = new Set([...Object.keys(baseLock.files ?? {}), ...Object.keys(lock.files ?? {})]);
+  for (const rel of paths) {
+    const before = baseLock.files?.[rel];
+    const after = lock.files?.[rel];
+    if (before === after) continue;
+    if (rel.startsWith('acceptance/specs/')) {
+      if (before === undefined) continue; // new spec files: their tests must be planned (checked above)
+      if (after === undefined) failures.push(`frozen spec ${rel} was removed`);
+      else if (!amendedFiles.has(rel)) failures.push(`frozen spec ${rel} changed without a recorded amendment`);
+    } else if (HARNESS_RECORDS.has(rel)) {
+      continue; // append-only checks above
+    } else if (rel.startsWith('harness/changes/')) {
+      if (before !== undefined) failures.push(`change request ${rel} was ${after === undefined ? 'removed' : 'edited'}`);
+    } else if (!authorizedKit.has(rel)) {
+      const what = before === undefined ? 'added' : after === undefined ? 'removed' : 'changed';
+      failures.push(`frozen kit file ${rel} was ${what} without authorization (run \`copilot-harness relock --reason ...\`)`);
+    }
+  }
 }
 
 const stable = (o, omit = []) => JSON.stringify(Object.fromEntries(Object.entries(o).filter(([k]) => !omit.includes(k)).sort()));
@@ -127,11 +214,13 @@ function main() {
   }
 
   const plan = readJson('harness/test_plan.json', { tests: [] });
-  const baseline = readJson('harness/baseline.json', { tests: {}, retired: {} });
+  const baseline = readJson('harness/baseline.json');
+  if (lock && !baseline) failures.push('harness/baseline.json is missing: the regression baseline cannot be skipped');
+  const baselineTests = baseline?.tests ?? {};
   const planned = new Map(plan.tests.map((t) => [t.id, t]));
   const active = plan.tests.filter((t) => (t.status ?? 'active') === 'active').map((t) => t.id);
-  const retired = new Set([...plan.tests.filter((t) => t.status === 'retired').map((t) => t.id), ...Object.keys(baseline.retired ?? {})]);
-  const baselineIds = Object.keys(baseline.tests ?? {}).filter((id) => !retired.has(id));
+  // Every baseline entry is enforced, whatever its plan status: authorized retirement moves it to baseline.retired.
+  const baselineIds = Object.keys(baselineTests);
 
   // 2./3. Results
   let outcomes = new Map();
@@ -151,38 +240,10 @@ function main() {
   // 4. Ratchet against the base branch
   if (args['base-ref']) {
     const ref = args['base-ref'];
-    const basePlan = gitShowJson(ref, 'harness/test_plan.json');
-    const baseReqs = gitShowJson(ref, 'harness/requirements.json');
-    const baseBaseline = gitShowJson(ref, 'harness/baseline.json');
-    const baseLock = gitShowJson(ref, 'harness/tests.lock.json');
-    for (const id of Object.keys(baseBaseline?.tests ?? {})) {
-      if (!(id in (baseline.tests ?? {})) && !(id in (baseline.retired ?? {}))) failures.push(`baseline test ${id} was removed (only retirement through a PRD change is allowed)`);
-    }
-    for (const t of basePlan?.tests ?? []) {
-      const now = planned.get(t.id);
-      if (!now) failures.push(`planned test ${t.id} was removed`);
-      else if (stable(t, ['status']) !== stable(now, ['status'])) failures.push(`planned test ${t.id} was edited (the plan is append-only)`);
-    }
-    const reqsNow = new Map((readJson('harness/requirements.json', { requirements: [] }).requirements).map((r) => [r.id, r]));
-    for (const r of baseReqs?.requirements ?? []) {
-      const now = reqsNow.get(r.id);
-      if (!now) failures.push(`requirement ${r.id} was removed`);
-      else if (stable(r, ['status', 'superseded_by']) !== stable(now, ['status', 'superseded_by'])) failures.push(`requirement ${r.id} was edited`);
-    }
-    if (baseLock && lock) {
-      const known = new Set((baseLock.amendments ?? []).map((a) => `${a.test_id}|${a.decided_at}`));
-      const newAmendments = (lock.amendments ?? []).filter((a) => !known.has(`${a.test_id}|${a.decided_at}`));
-      const amendedFiles = new Set(newAmendments.map((a) => {
-        const t = planned.get(a.test_id);
-        return t ? `acceptance/specs/${t.category}/${t.group}.spec.ts` : '';
-      }));
-      for (const [rel, digest] of Object.entries(baseLock.files ?? {})) {
-        if (!rel.startsWith('acceptance/specs/')) continue;
-        if (lock.files[rel] !== undefined && lock.files[rel] !== digest && !amendedFiles.has(rel)) {
-          failures.push(`frozen spec ${rel} changed without a recorded amendment`);
-        }
-        if (lock.files[rel] === undefined) failures.push(`frozen spec ${rel} was removed`);
-      }
+    if (!refResolves(ref)) {
+      failures.push(`base ref ${ref} cannot be resolved; fetch it (actions/checkout fetch-depth: 0) so the ratchet can run`);
+    } else {
+      ratchet(ref, { lock, baseline: baselineTests, retiredNow: baseline?.retired ?? {}, plan, planned, failures });
     }
   }
 

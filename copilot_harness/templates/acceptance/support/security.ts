@@ -37,7 +37,13 @@ export function expectSecurityHeaders(res: APIResponse, opts: { csp?: boolean; h
   const problems: string[] = [];
   if ((opts.csp ?? true) && !csp) problems.push('missing Content-Security-Policy');
   if ((h['x-content-type-options'] ?? '').toLowerCase() !== 'nosniff') problems.push('X-Content-Type-Options must be nosniff');
-  if (!/frame-ancestors/i.test(csp) && !/^(deny|sameorigin)$/i.test(h['x-frame-options'] ?? '')) {
+  // Browsers prefer CSP frame-ancestors over X-Frame-Options, so a permissive frame-ancestors wins.
+  const frameAncestors = /(?:^|;)\s*frame-ancestors\b([^;]*)/i.exec(csp);
+  if (frameAncestors) {
+    const sources = frameAncestors[1].trim().split(/\s+/).filter(Boolean);
+    const permissive = !sources.length || sources.some((s) => s === '*' || /^[a-z][a-z0-9+.-]*:(\/\/\*)?$/i.test(s));
+    if (permissive) problems.push(`CSP frame-ancestors is permissive (${frameAncestors[1].trim() || 'empty'}); use 'none', 'self' or explicit origins`);
+  } else if (!/^(deny|sameorigin)$/i.test(h['x-frame-options'] ?? '')) {
     problems.push('clickjacking protection missing (CSP frame-ancestors or X-Frame-Options)');
   }
   if (!h['referrer-policy']) problems.push('missing Referrer-Policy');
@@ -63,8 +69,8 @@ export function expectSecureCookies(res: APIResponse, opts: { names?: string[]; 
     seen.add(name);
     const a = attrs.map((s) => s.trim().toLowerCase());
     if (!a.includes('httponly')) problems.push(`${name}: missing HttpOnly`);
-    const sameSite = a.find((x) => x.startsWith('samesite='));
-    if (!sameSite || sameSite === 'samesite=none') problems.push(`${name}: SameSite must be Lax or Strict`);
+    const sameSite = a.find((x) => x.startsWith('samesite='))?.slice('samesite='.length).trim();
+    if (sameSite !== 'lax' && sameSite !== 'strict') problems.push(`${name}: SameSite must be Lax or Strict (got ${sameSite ?? 'none'})`);
     if ((opts.requireSecure ?? res.url().startsWith('https:')) && !a.includes('secure')) problems.push(`${name}: missing Secure`);
   }
   for (const n of opts.names ?? []) if (!seen.has(n)) problems.push(`${n}: cookie was not set`);

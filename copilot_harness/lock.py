@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from copilot_harness.gitops import Git
-from copilot_harness.models import Amendment, TestLock, utcnow
+from copilot_harness.models import Amendment, KitChange, TestLock, utcnow
 from copilot_harness.paths import ProjectPaths
 
 LOCKED_DIRS = ("acceptance",)
@@ -75,6 +75,7 @@ def create_lock(
     test_ids: Iterable[str],
     previous: TestLock | None = None,
     amendments: Iterable[Amendment] = (),
+    kit_changes: Iterable[KitChange] = (),
 ) -> TestLock:
     return TestLock(
         version=(previous.version + 1) if previous else 1,
@@ -82,6 +83,7 @@ def create_lock(
         files=compute_manifest(paths),
         test_ids=sorted(set(test_ids)),
         amendments=[*(previous.amendments if previous else []), *amendments],
+        kit_changes=[*(previous.kit_changes if previous else []), *kit_changes],
     )
 
 

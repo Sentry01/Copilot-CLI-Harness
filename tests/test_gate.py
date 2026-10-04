@@ -11,11 +11,21 @@ import pytest
 
 from copilot_harness.gitops import Git
 from copilot_harness.lock import create_lock
-from copilot_harness.models import Amendment, Baseline, BaselineEntry, TestPlan, write_json
+from copilot_harness.models import (
+    Amendment,
+    Baseline,
+    BaselineEntry,
+    KitChange,
+    RequirementsDoc,
+    TestLock,
+    TestPlan,
+    load_model,
+    write_json,
+)
 from copilot_harness.paths import ProjectPaths
 from copilot_harness.project import TEMPLATES
 
-from .notes_project import PLAN, SPECS
+from .notes_project import CONTRACT, PLAN, PRD, REQUIREMENTS, SPECS
 
 pytestmark = pytest.mark.skipif(shutil.which("node") is None, reason="needs Node.js")
 
@@ -30,6 +40,9 @@ def project(tmp_path: Path) -> ProjectPaths:
     paths.harness.mkdir(parents=True)
     write_json(paths.test_plan, TestPlan.model_validate(PLAN))
     write_json(paths.baseline, Baseline(tests={"FUNC-001": BaselineEntry(), "SEC-001": BaselineEntry()}))
+    write_json(paths.requirements, RequirementsDoc.model_validate(REQUIREMENTS))
+    paths.contract.write_text(json.dumps(CONTRACT))
+    paths.prd.write_text(PRD)
     write_json(paths.lock, create_lock(paths, [t["id"] for t in PLAN["tests"]]))
     (paths.root / ".gitignore").write_text("acceptance/reports/\n")
     git = Git(paths.root)
@@ -119,8 +132,6 @@ def test_base_ref_ratchet(project):
     write_json(project.baseline, Baseline(tests={"FUNC-001": BaselineEntry(), "SEC-001": BaselineEntry()}))
     spec = project.specs / "functional" / "notes.spec.ts"
     spec.write_text(spec.read_text() + "\n// tweak\n")
-    from copilot_harness.models import TestLock, load_model
-
     old = load_model(TestLock, project.lock)
     write_json(project.lock, create_lock(project, old.test_ids, previous=old))
     r = gate(project, report(ALL_PASS), "--base-ref", base)
@@ -128,3 +139,70 @@ def test_base_ref_ratchet(project):
     write_json(project.lock, create_lock(project, old.test_ids, previous=old,
                                          amendments=[Amendment(test_id="FUNC-002", reason="adjudicated")]))
     assert gate(project, report(ALL_PASS), "--base-ref", base).returncode == 0
+
+
+def relock(project, **kw):
+    old = load_model(TestLock, project.lock)
+    write_json(project.lock, create_lock(project, old.test_ids, previous=old, **kw))
+
+
+def test_missing_baseline_fails(project):
+    project.baseline.unlink()
+    r = gate(project, report(ALL_PASS))
+    assert r.returncode == 1 and "harness/baseline.json is missing" in r.stdout
+
+
+def test_unresolvable_base_ref_fails(project):
+    r = gate(project, report(ALL_PASS), "--base-ref", "origin/does-not-exist")
+    assert r.returncode == 1 and "cannot be resolved" in r.stdout
+
+
+def test_skipped_repetitions_are_a_regression(project):
+    rep = report(ALL_PASS)
+    rep["suites"][0]["specs"] += [{"title": "SEC-001: t", "tests": [{"results": [{"status": "skipped"}]}]}]
+    r = gate(project, rep)
+    assert r.returncode == 1 and "REGRESSION SEC-001: skipped" in r.stdout
+
+
+def test_retiring_a_baselined_test_in_the_plan_does_not_hide_it(project):
+    plan = json.loads(project.test_plan.read_text())
+    next(t for t in plan["tests"] if t["id"] == "SEC-001")["status"] = "retired"
+    project.test_plan.write_text(json.dumps(plan, indent=2))
+    relock(project)
+    r = gate(project, report({k: v for k, v in ALL_PASS.items() if k != "SEC-001"}))
+    assert r.returncode == 1 and "REGRESSION SEC-001: did not run" in r.stdout
+
+
+def test_base_ref_rejects_retiring_tests_of_active_requirements(project):
+    base = Git(project.root).head()
+    plan = json.loads(project.test_plan.read_text())
+    next(t for t in plan["tests"] if t["id"] == "UX-001")["status"] = "retired"
+    project.test_plan.write_text(json.dumps(plan, indent=2))
+    relock(project)
+    r = gate(project, report(ALL_PASS), "--base-ref", base)
+    assert r.returncode == 1 and "UX-001 was retired but its requirements are still active: REQ-004" in r.stdout
+
+
+def test_base_ref_requires_authorization_for_kit_changes(project):
+    base = Git(project.root).head()
+    kit = project.acceptance / "support" / "security.ts"
+    kit.write_text(kit.read_text().replace("expect(problems", "expect([] as string[]"))  # neuter the helper
+    relock(project)
+    r = gate(project, report(ALL_PASS), "--base-ref", base)
+    assert r.returncode == 1 and "frozen kit file acceptance/support/security.ts was changed without authorization" in r.stdout
+    old = load_model(TestLock, project.lock)
+    write_json(project.lock, old.model_copy(update={"kit_changes": [KitChange(path="acceptance/support/security.ts", reason="upgrade")]}))
+    assert gate(project, report(ALL_PASS), "--base-ref", base).returncode == 0
+
+
+def test_base_ref_rejects_contract_removals_and_prd_edits(project):
+    base = Git(project.root).head()
+    contract = json.loads(project.contract.read_text())
+    contract["api"] = contract["api"][:1]
+    project.contract.write_text(json.dumps(contract))
+    project.prd.write_text(PRD.replace("Empty notes are rejected.", "Empty notes are fine."))
+    relock(project)
+    r = gate(project, report(ALL_PASS), "--base-ref", base)
+    assert r.returncode == 1
+    assert "contract endpoint POST /api/notes was removed" in r.stdout
+    assert "harness/PRD.md was edited" in r.stdout
