@@ -63,6 +63,9 @@ specified now, precisely.
 - Serve every asset (scripts, styles, fonts, images) from the app itself. The acceptance runner
   blocks all hosts except the app, so CDN or third-party resources fail to load in tests.
 - Use `npm ci` only if you generate `app/package-lock.json` (run `npm install` once in `app/`).
+- Pin dependencies in a lockfile CI can audit: `app/package-lock.json` (npm) or
+  `app/pnpm-lock.yaml` for Node; a pinned `app/requirements.txt` or `app/uv.lock` for Python.
+  The dependency audit fails on other layouts.
 
 ## 3. Scaffold `app/`
 

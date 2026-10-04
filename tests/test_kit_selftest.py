@@ -28,10 +28,8 @@ def test_every_kit_helper_passes_good_and_catches_bad(tmp_path: Path) -> None:
     paths = create_project(tmp_path / "kit", prd, install=True, out=lambda *_: None)
     shutil.copy(HERE / "server.js", paths.app / "server.js")
     (paths.specs / "functional" / "kit.spec.ts").write_text((HERE / "kit.spec.ts").read_text())
-    paths.app_contract.write_text(json.dumps({
-        "stack": "node", "install": [], "build": [], "start": "node app/server.js",
-        "base_url": "http://127.0.0.1:3000", "health_path": "/health", "startup_timeout_seconds": 30,
-    }))
+    # Minimal contract: health_path, startup timeout etc. come from the kit's defaults.
+    paths.app_contract.write_text(json.dumps({"stack": "node", "start": "node app/server.js"}))
     paths.contract.write_text(json.dumps({"test_hooks": {"reset": "POST /__test__/reset"}}))
     env = {**os.environ, "APP_PORT": str(free_port())}
     if not env.get("PW_CHROMIUM_EXECUTABLE") and Path("/opt/pw-browsers/chromium").exists():
@@ -43,4 +41,4 @@ def test_every_kit_helper_passes_good_and_catches_bad(tmp_path: Path) -> None:
     run = subprocess.run(["npx", "playwright", "test", "--reporter=list"], cwd=paths.acceptance, env=env,
                          capture_output=True, text=True, timeout=600)
     assert run.returncode == 0, run.stdout[-6000:] + run.stderr[-2000:]
-    assert "23 passed" in run.stdout, run.stdout[-3000:]
+    assert "26 passed" in run.stdout, run.stdout[-3000:]

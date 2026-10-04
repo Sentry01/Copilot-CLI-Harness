@@ -46,6 +46,14 @@ test.describe('good', () => {
     await expectNoHorizontalOverflow(page);
   });
 
+  test('focus indicators drawn by outline, shadow or the browser default', async ({ page }) => {
+    for (const style of ['', 'button:focus-visible { outline: none; box-shadow: 0 0 0 3px #1a73e8; }',
+      'button:focus-visible { outline: 2px solid #000; outline-offset: 4px; }']) {
+      await page.setContent(`<style>${style}</style><main><button>Save</button></main>`);
+      await expectVisibleFocus(page, page.getByRole('button', { name: 'Save' }));
+    }
+  });
+
   test('only the app is reachable', async ({ page, request, playwright, browser }) => {
     expect((await request.get('/health')).ok()).toBe(true);
     await expect(request.get('http://example.com/')).rejects.toThrow(BLOCKED);
@@ -113,6 +121,14 @@ test.describe('detects defects', () => {
   test.fail('protocol-relative reset hook', async () => { resetHookRequest('POST //external.example/reset'); });
   test.fail('backslash reset hook', async () => { resetHookRequest('POST /\\external.example/reset'); });
   test.fail('absolute reset hook', async () => { resetHookRequest('POST https://external.example/reset'); });
+  test.fail('transparent focus outline', async ({ page }) => {
+    await page.setContent('<button style="outline: 3px solid transparent">Save</button>');
+    await expectVisibleFocus(page, page.getByRole('button', { name: 'Save' }));
+  });
+  test.fail('always-on shadow that does not change on focus', async ({ page }) => {
+    await page.setContent('<button style="outline: none; box-shadow: 0 0 0 3px #1a73e8">Save</button>');
+    await expectVisibleFocus(page, page.getByRole('button', { name: 'Save' }));
+  });
   test.fail('a11y violation', async ({ page }) => {
     await page.setContent('<html><body><img src="x.png"><input></body></html>');
     await expectNoA11yViolations(page, { impacts: ['minor', 'moderate', 'serious', 'critical'] });

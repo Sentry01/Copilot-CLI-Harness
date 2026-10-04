@@ -237,6 +237,10 @@ def relock_kit(paths: ProjectPaths, reason: str, out=print) -> int:
         out(f"error: change {h.state.active_change} is in progress; finish it with `copilot-harness run` first")
         return 2
     drift = verify_lock(paths, lock)
+    if drift.symlinks:
+        out("error: symlinks are not allowed in frozen paths; replace them with regular files:\n  "
+            + "\n  ".join(drift.symlinks))
+        return 2
     changed = sorted(drift.modified + drift.missing + drift.added)
     if not changed:
         out("lock is intact; nothing to relock")

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 from pathlib import Path
@@ -226,3 +227,61 @@ def test_base_ref_rejects_contract_removals_and_prd_edits(project):
     assert r.returncode == 1
     assert "contract endpoint POST /api/notes was removed" in r.stdout
     assert "harness/PRD.md was edited" in r.stdout
+
+
+def test_symlinks_in_the_frozen_suite_fail_without_crashing_the_gate(project):
+    import os
+
+    os.symlink("support", project.acceptance / "alias")
+    os.symlink(".", project.acceptance / "loop")
+    r = gate(project, report(ALL_PASS))
+    assert r.returncode == 1, r.stdout + r.stderr
+    assert "symlink inside the frozen suite (not allowed): acceptance/alias" in r.stdout
+    assert "symlink inside the frozen suite (not allowed): acceptance/loop" in r.stdout
+    assert "acceptance/alias/" not in r.stdout  # never followed
+
+
+def test_gate_and_lock_agree_on_the_manifest(project):
+    """The Python lock and gate.mjs must walk the same files, or a fresh lock fails CI."""
+    r = gate(project, report(ALL_PASS))
+    assert r.returncode == 0, r.stdout
+    assert "unfrozen file" not in r.stdout and "modified without" not in r.stdout
+
+
+def _node_strips_types() -> bool:
+    out = subprocess.run(["node", "--version"], capture_output=True, text=True).stdout.strip().lstrip("v")
+    major, minor, *_ = (int(x) for x in out.split("."))
+    return (major, minor) >= (22, 6)
+
+
+def test_kit_applies_the_same_app_contract_defaults_as_the_harness(tmp_path):
+    if not _node_strips_types():
+        pytest.skip("needs Node.js >= 22.6 (--experimental-strip-types)")
+    from copilot_harness.models import AppContract
+
+    (tmp_path / "harness").mkdir()
+    minimal = {"stack": "node", "start": "node app/server.js"}
+    (tmp_path / "harness" / "app-contract.json").write_text(json.dumps(minimal))
+    shutil.copy(TEMPLATES / "acceptance" / "support" / "contract.ts", tmp_path / "contract.ts")
+    r = subprocess.run(
+        ["node", "--experimental-strip-types", "--no-warnings", "-e",
+         "import('./contract.ts').then((m) => console.log(JSON.stringify(m.appContract)))"],
+        cwd=tmp_path, capture_output=True, text=True, env={**os.environ, "HARNESS_PROJECT_ROOT": str(tmp_path)},
+    )
+    assert r.returncode == 0, r.stderr
+    assert json.loads(r.stdout) == AppContract.model_validate(minimal).model_dump()
+
+
+def test_base_ref_rejects_reactivating_a_superseded_requirement(project):
+    reqs = json.loads(project.requirements.read_text())
+    old = next(r for r in reqs["requirements"] if r["id"] == "REQ-004")
+    reqs["requirements"].append({**old, "id": "REQ-005", "origin": "CHG-001"})
+    old.update(status="superseded", superseded_by=["REQ-005"])
+    project.requirements.write_text(json.dumps(reqs, indent=2))
+    relock(project)
+    base = Git(project.root).commit_all("supersede REQ-004")
+    old.update(status="active", superseded_by=[])
+    project.requirements.write_text(json.dumps(reqs, indent=2))
+    relock(project)
+    r = gate(project, report(ALL_PASS), "--base-ref", base)
+    assert r.returncode == 1 and "requirement REQ-004 was superseded and cannot be reactivated" in r.stdout

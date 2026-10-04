@@ -130,3 +130,35 @@ def test_commit_paths_commits_only_the_given_paths(tmp_path: Path):
     assert git.run("diff", "--cached", "--name-only").split() == ["b.txt"]  # still staged, not committed
     head = git.head()
     assert git.commit_paths("noop", ["a.txt"]) == head
+
+
+def test_symlinks_in_frozen_paths_are_listed_never_followed(tmp_path: Path):
+    import os
+
+    import pytest
+
+    from copilot_harness.lock import LockError, locked_files
+
+    paths = ProjectPaths.at(tmp_path)
+    (paths.acceptance / "support").mkdir(parents=True)
+    (paths.acceptance / "support" / "kit.ts").write_text("kit")
+    paths.harness.mkdir()
+    (tmp_path / ".gitignore").write_text(".harness/\n")
+    git = Git(tmp_path)
+    git.init()
+    git.commit_all("init")
+    lock = create_lock(paths, [])
+
+    os.symlink("support", paths.acceptance / "alias")      # directory link
+    os.symlink(".", paths.acceptance / "loop")              # cycle
+    os.symlink("missing.ts", paths.acceptance / "dangling")  # broken link
+    files = locked_files(paths)
+    assert files == ["acceptance/alias", "acceptance/dangling", "acceptance/loop", "acceptance/support/kit.ts"]
+    drift = verify_lock(paths, lock)
+    assert drift.symlinks == ["acceptance/alias", "acceptance/dangling", "acceptance/loop"] and not drift.ok
+    with pytest.raises(LockError, match="symlinks are not allowed"):
+        create_lock(paths, [])
+
+    assert restore_lock(paths, lock, git, "HEAD", "t1").ok
+    assert not (paths.acceptance / "alias").is_symlink()
+    assert (paths.quarantine / "t1" / "acceptance" / "loop").is_symlink()

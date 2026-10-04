@@ -27,7 +27,19 @@ export interface Contract {
   [key: string]: unknown;
 }
 
-export const appContract = readJson<AppContract | null>('harness/app-contract.json', null);
+const rawAppContract = readJson<Partial<AppContract> | null>('harness/app-contract.json', null);
+/** harness/app-contract.json with the same defaults as the harness's AppContract model. */
+export const appContract: AppContract | null = rawAppContract && {
+  ...rawAppContract,
+  stack: rawAppContract.stack ?? '',
+  install: rawAppContract.install ?? [],
+  build: rawAppContract.build ?? [],
+  start: rawAppContract.start ?? '',
+  base_url: rawAppContract.base_url ?? 'http://127.0.0.1:3000',
+  health_path: rawAppContract.health_path ?? '/health',
+  env: rawAppContract.env ?? {},
+  startup_timeout_seconds: rawAppContract.startup_timeout_seconds ?? 120,
+};
 export const contract = readJson<Contract>('harness/contract.json', {});
 const plan = readJson<{ tests: { id: string; status?: string }[] }>('harness/test_plan.json', { tests: [] });
 export const retiredIds = plan.tests.filter((t) => t.status === 'retired').map((t) => t.id);

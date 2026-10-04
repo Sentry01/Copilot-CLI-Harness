@@ -84,12 +84,4 @@ jobs:
         with:
           python-version: "3.12"
       - name: Audit app dependencies
-        run: |
-          status=0
-          if [ -f app/package-lock.json ]; then
-            (cd app && npm audit --audit-level=high --omit=dev) || status=1
-          fi
-          if [ -f app/requirements.txt ]; then
-            pipx run pip-audit -r app/requirements.txt || status=1
-          fi
-          exit $status
+        run: bash acceptance/scripts/audit.sh

@@ -17,7 +17,7 @@
  */
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { appendFileSync, existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { appendFileSync, existsSync, lstatSync, readFileSync, readdirSync, readlinkSync } from 'node:fs';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -41,15 +41,21 @@ const readJson = (rel, fallback = null) => {
   const p = join(ROOT, rel);
   return existsSync(p) ? JSON.parse(readFileSync(p, 'utf8')) : fallback;
 };
-const sha256 = (p) => createHash('sha256').update(readFileSync(p)).digest('hex');
+const lstat = (p) => { try { return lstatSync(p); } catch { return null; } };
+const isLink = (p) => lstat(p)?.isSymbolicLink() ?? false;
+// Same digest as the harness's lock.py: a symlink is recorded by its target and never followed.
+const digestOf = (p) => (isLink(p) ? `symlink:${readlinkSync(p)}` : createHash('sha256').update(readFileSync(p)).digest('hex'));
 const posix = (p) => p.split(sep).join('/');
 
+/** Lists files and symlinks; never follows a symlink (same walk as lock.py). */
 function walk(dir, out = []) {
-  if (!existsSync(dir)) return out;
+  const st = lstat(dir);
+  if (!st) return out;
+  if (!st.isDirectory()) { out.push(posix(relative(ROOT, dir))); return out; }
   for (const name of readdirSync(dir)) {
     if (EXCLUDED.has(name)) continue;
     const p = join(dir, name);
-    if (statSync(p).isDirectory()) walk(p, out);
+    if (lstat(p)?.isDirectory()) walk(p, out);
     else out.push(posix(relative(ROOT, p)));
   }
   return out;
@@ -58,7 +64,7 @@ function walk(dir, out = []) {
 function lockedFiles() {
   const files = new Set();
   for (const d of LOCKED_DIRS) walk(join(ROOT, d)).forEach((f) => files.add(f));
-  for (const f of LOCKED_FILES) if (existsSync(join(ROOT, f))) files.add(f);
+  for (const f of LOCKED_FILES) if (lstat(join(ROOT, f))) files.add(f);
   const changes = join(ROOT, 'harness', 'changes');
   if (existsSync(changes)) for (const n of readdirSync(changes)) if (n.endsWith('.md')) files.add(`harness/changes/${n}`);
   const wf = join(ROOT, '.github', 'workflows');
@@ -149,6 +155,9 @@ function ratchet(ref, { lock, baseline, retiredNow, plan, planned, failures }) {
     const now = reqsNow.get(r.id);
     if (!now) failures.push(`requirement ${r.id} was removed`);
     else if (stable(r, ['status', 'superseded_by']) !== stable(now, ['status', 'superseded_by'])) failures.push(`requirement ${r.id} was edited`);
+    else if (r.status === 'superseded' && (now.status !== 'superseded' || JSON.stringify(r.superseded_by ?? []) !== JSON.stringify(now.superseded_by ?? []))) {
+      failures.push(`requirement ${r.id} was superseded and cannot be reactivated or re-pointed; add a new requirement`);
+    }
   }
   const baseContract = gitShowJson(ref, 'harness/contract.json');
   if (baseContract) {
@@ -208,10 +217,11 @@ function main() {
   else {
     const current = lockedFiles();
     for (const [rel, digest] of Object.entries(lock.files)) {
-      if (!existsSync(join(ROOT, rel))) failures.push(`frozen file deleted: ${rel}`);
-      else if (sha256(join(ROOT, rel)) !== digest) failures.push(`frozen file modified without re-freezing: ${rel}`);
+      if (!lstat(join(ROOT, rel))) failures.push(`frozen file deleted: ${rel}`);
+      else if (digestOf(join(ROOT, rel)) !== digest) failures.push(`frozen file modified without re-freezing: ${rel}`);
     }
     for (const rel of current) if (!(rel in lock.files)) failures.push(`unfrozen file inside the acceptance suite: ${rel}`);
+    for (const rel of current) if (isLink(join(ROOT, rel))) failures.push(`symlink inside the frozen suite (not allowed): ${rel}`);
   }
 
   const plan = readJson('harness/test_plan.json', { tests: [] });

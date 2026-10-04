@@ -8,6 +8,7 @@ tautologies). The checks are deliberately lexical and conservative.
 
 from __future__ import annotations
 
+import os
 import re
 from collections.abc import Iterable
 from dataclasses import dataclass, field
@@ -292,7 +293,13 @@ def lint_specs(specs_dir: Path, plan: TestPlan, root: Path, expected_ids: Iterab
     report = LintReport()
     planned = plan.by_id()
     seen: dict[str, SpecTest] = {}
-    files = sorted(specs_dir.rglob("*.spec.ts")) if specs_dir.exists() else []
+    for dirpath, dirnames, filenames in os.walk(specs_dir):
+        for name in [*dirnames, *filenames]:
+            path = Path(dirpath) / name
+            if path.is_symlink():
+                rel = path.relative_to(root).as_posix() if path.is_relative_to(root) else str(path)
+                report.issues.append(LintIssue(rel, 0, "error", "symlinks are not allowed in the suite; write a regular spec file"))
+    files = sorted(p for p in specs_dir.rglob("*.spec.ts") if not p.is_symlink()) if specs_dir.exists() else []
     for path in files:
         rel = path.resolve().relative_to(root).as_posix()
         tests, issues = lint_source(path.read_text(encoding="utf-8"), rel)

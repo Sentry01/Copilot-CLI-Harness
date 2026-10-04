@@ -105,6 +105,8 @@ def _check_append_only_requirements(
             for s in new.superseded_by:
                 if s in previous.by_id():
                     issues.append(f"{old.id} can only be superseded by a requirement added in this change, not {s}")
+        if old.status == "superseded" and (new.status != "superseded" or new.superseded_by != old.superseded_by):
+            issues.append(f"{old.id} is superseded and stays that way; add a new requirement to reintroduce the behaviour")
     added = [r for r in doc.requirements if r.id not in previous.by_id()]
     if delta_origin is not None:
         if not added:

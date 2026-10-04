@@ -145,3 +145,16 @@ test('FUNC-001: a', async () => {
     rejected = sorted(m.split("'")[1] for m in msgs if m.startswith("import from"))
     assert rejected == ["@playwright/test", "node:child_process", "node:http"]  # the type-only import is fine
     assert sum("require()/dynamic import()" in m for m in msgs) == 2
+
+
+def test_symlinked_specs_are_rejected(tmp_path: Path):
+    import os
+
+    specs = tmp_path / "acceptance" / "specs" / "functional"
+    specs.mkdir(parents=True)
+    (tmp_path / "app").mkdir()
+    (tmp_path / "app" / "x.spec.ts").write_text(GOOD)
+    os.symlink(tmp_path / "app" / "x.spec.ts", specs / "linked.spec.ts")
+    report = lint_specs(tmp_path / "acceptance" / "specs", _plan(("FUNC-001", "functional", "notes")), tmp_path, expected_ids=[])
+    assert [i.message for i in report.errors] == ["symlinks are not allowed in the suite; write a regular spec file"]
+    assert report.found == {}

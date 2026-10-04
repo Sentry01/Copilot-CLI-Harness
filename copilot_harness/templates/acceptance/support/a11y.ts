@@ -37,16 +37,66 @@ export async function expectKeyboardReachable(page: Page, target: Locator, maxTa
   expect(false, `element not reachable with ${maxTabs} Tab presses`).toBe(true);
 }
 
-/** The keyboard-focused element must show a visible focus indicator. */
-export async function expectVisibleFocus(page: Page, target: Locator): Promise<void> {
+/**
+ * Focusing `target` with the keyboard must visibly change it (WCAG 2.4.7). Compares screenshots
+ * of the element and its surroundings before and after focus, so any real indicator counts
+ * (outline, shadow, border, background) and a transparent outline or a permanent decorative
+ * shadow does not. `minChangedPixels` is how many pixels must change clearly.
+ */
+export async function expectVisibleFocus(page: Page, target: Locator, opts: { minChangedPixels?: number } = {}): Promise<void> {
+  await target.scrollIntoViewIfNeeded();
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  const shot = async () =>
+    page.screenshot({ clip: await aroundElement(target, 8), animations: 'disabled', caret: 'hide' });
+  const unfocused = await shot();
   await expectKeyboardReachable(page, target);
-  const visible = await target.evaluate((el) => {
-    const s = getComputedStyle(el);
-    const outline = s.outlineStyle !== 'none' && parseFloat(s.outlineWidth) > 0;
-    const shadow = s.boxShadow !== 'none' && s.boxShadow !== '';
-    return outline || shadow;
-  });
-  expect(visible, 'focused element must have a visible focus indicator (outline or box-shadow)').toBe(true);
+  const focused = await shot();
+  const changed = await changedPixels(page, unfocused, focused);
+  expect(
+    changed,
+    'focusing the element must visibly change it (outline, shadow, border or background); ' +
+      'a transparent outline or an always-on style is not a focus indicator',
+  ).toBeGreaterThanOrEqual(opts.minChangedPixels ?? 16);
+}
+
+/** The element's box plus `pad` px on each side (outlines and shadows are drawn outside the box). */
+async function aroundElement(target: Locator, pad: number) {
+  const box = await target.boundingBox();
+  expect(box, 'target must be visible').not.toBeNull();
+  const x = Math.max(0, box!.x - pad);
+  const y = Math.max(0, box!.y - pad);
+  return { x, y, width: box!.x + box!.width + pad - x, height: box!.y + box!.height + pad - y };
+}
+
+/** Pixels whose colour differs clearly between two PNGs, decoded in a blank page of the same browser. */
+async function changedPixels(page: Page, a: Buffer, b: Buffer): Promise<number> {
+  const scratch = await page.context().newPage();
+  try {
+    return await scratch.evaluate(async ([a64, b64]) => {
+      const decode = async (b64: string) => {
+        const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+        const bitmap = await createImageBitmap(new Blob([bytes], { type: 'image/png' }));
+        const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+        const ctx = canvas.getContext('2d')!;
+        ctx.drawImage(bitmap, 0, 0);
+        return ctx.getImageData(0, 0, bitmap.width, bitmap.height);
+      };
+      const [x, y] = await Promise.all([decode(a64), decode(b64)]);
+      if (x.width !== y.width || x.height !== y.height) return x.width * x.height;
+      let n = 0;
+      for (let i = 0; i < x.data.length; i += 4) {
+        const d = Math.max(
+          Math.abs(x.data[i] - y.data[i]),
+          Math.abs(x.data[i + 1] - y.data[i + 1]),
+          Math.abs(x.data[i + 2] - y.data[i + 2]),
+        );
+        if (d >= 48) n++;
+      }
+      return n;
+    }, [a.toString('base64'), b.toString('base64')] as const);
+  } finally {
+    await scratch.close();
+  }
 }
 
 export async function expectNoHorizontalOverflow(page: Page): Promise<void> {

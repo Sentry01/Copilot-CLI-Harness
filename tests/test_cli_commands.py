@@ -77,6 +77,16 @@ def test_relock_authorizes_kit_changes_but_not_spec_changes(tmp_path):
     assert any("cannot be relocked" in ln for ln in lines)
 
 
+def test_relock_refuses_symlinks(tmp_path):
+    import os
+
+    h = frozen_project(tmp_path)
+    os.symlink("support", h.paths.acceptance / "alias")
+    lines = []
+    assert relock_kit(h.paths, "link the kit", out=lines.append) == 2
+    assert "symlinks are not allowed" in lines[0] and "acceptance/alias" in lines[0]
+
+
 def test_honest_pipeline_still_completes(tmp_path):
     h, *_ = make(tmp_path, coder=honest_coder)
     assert asyncio.run(h.run()).startswith("done")

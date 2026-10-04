@@ -144,3 +144,19 @@ def test_contract_reset_hook_must_stay_on_the_app(tmp_path):
         data = {**CONTRACT, "test_hooks": {"reset": hook}}
         contract, issues = validate_contract(write(tmp_path, "c.json", data))
         assert contract is None and any("reset" in i for i in issues), hook
+
+
+def test_superseded_requirements_cannot_be_reactivated(tmp_path):
+    prev = copy.deepcopy(REQUIREMENTS)
+    prev["requirements"][1].update(status="superseded", superseded_by=["REQ-005"])
+    prev["requirements"].append({"id": "REQ-005", "title": "Headers v2", "type": "security", "priority": "P1",
+                                 "description": "desc", "acceptance_criteria": ["a"], "origin": "CHG-001"})
+    previous = RequirementsDoc.model_validate(prev)
+    new_req = {"id": "REQ-006", "title": "Other", "type": "functional", "priority": "P1",
+               "description": "desc", "acceptance_criteria": ["a"], "origin": "CHG-002"}
+    for change in ({"status": "active", "superseded_by": []}, {"superseded_by": ["REQ-004"]}):
+        doc = copy.deepcopy(prev)
+        doc["requirements"][1].update(change)
+        doc["requirements"].append(new_req)
+        _, issues = validate_requirements(write(tmp_path, "r.json", doc), previous, "CHG-002")
+        assert any("REQ-002 is superseded and stays that way" in i for i in issues), change
