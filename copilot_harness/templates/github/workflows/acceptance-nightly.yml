@@ -1,0 +1,53 @@
+# Managed by copilot-harness (frozen with the acceptance suite).
+# Nightly stability run: every test runs 3 times. A baseline test that fails even once is
+# reported as flaky and fails the gate, so flakiness is fixed instead of tolerated.
+name: acceptance-nightly
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  stability:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      PERF_BUDGET_MULTIPLIER: "1.5"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Install and build the app
+        run: |
+          node acceptance/scripts/app.mjs install
+          node acceptance/scripts/app.mjs build
+      - name: Install the acceptance suite
+        working-directory: acceptance
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+      - name: Run the acceptance suite three times
+        working-directory: acceptance
+        continue-on-error: true
+        run: npx playwright test --repeat-each=3
+      - name: Stability gate
+        run: >-
+          node acceptance/scripts/gate.mjs
+          --report acceptance/reports/report.json
+          --summary "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: acceptance-nightly-report
+          path: |
+            acceptance/playwright-report
+            acceptance/reports
+          retention-days: 14

@@ -1,0 +1,26 @@
+# copilot-harness local state (logs, runs, disputes) — never committed
+.harness/
+
+# dependencies and build output
+node_modules/
+dist/
+build/
+.next/
+coverage/
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# acceptance run artifacts
+acceptance/test-results/
+acceptance/playwright-report/
+acceptance/blob-report/
+acceptance/reports/
+
+# local environment
+.env
+.env.*
+!.env.example
+.DS_Store
+*.log
