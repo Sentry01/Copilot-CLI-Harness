@@ -9,3 +9,9 @@ __pycache__
 .DS_Store
 .playwright-mcp
 harness_logs
+# python packaging / tooling
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/

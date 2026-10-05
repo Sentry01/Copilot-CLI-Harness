@@ -1,0 +1,16 @@
+{
+  "name": "acceptance",
+  "private": true,
+  "description": "Frozen, executable acceptance suite generated and managed by copilot-harness",
+  "scripts": {
+    "test": "playwright test",
+    "typecheck": "tsc --noEmit -p .",
+    "gate": "node scripts/gate.mjs --report reports/report.json"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.13.0",
+    "@playwright/test": "1.63.0",
+    "@types/node": "22.20.5",
+    "typescript": "5.9.3"
+  }
+}

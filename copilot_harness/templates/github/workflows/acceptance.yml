@@ -1,0 +1,87 @@
+# Managed by copilot-harness (frozen with the acceptance suite).
+# Runs the full acceptance suite on every PR and push; the gate fails on any regression
+# of the baseline, on tampering with frozen tests, or on removing planned tests.
+name: acceptance
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: acceptance-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      # CI hardware is slower and noisier than a dev machine; scale perf budgets, never edit tests.
+      PERF_BUDGET_MULTIPLIER: "1.5"
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install and build the app
+        run: |
+          node acceptance/scripts/app.mjs install
+          node acceptance/scripts/app.mjs build
+
+      - name: Install the acceptance suite
+        working-directory: acceptance
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Type-check the acceptance suite
+        working-directory: acceptance
+        run: npm run typecheck
+
+      - name: Run the acceptance suite
+        working-directory: acceptance
+        continue-on-error: true   # the gate below decides; backlog tests are allowed to fail
+        run: npx playwright test
+
+      - name: Regression gate
+        run: >-
+          node acceptance/scripts/gate.mjs
+          --report acceptance/reports/report.json
+          --summary "$GITHUB_STEP_SUMMARY"
+          ${{ github.event_name == 'pull_request' && format('--base-ref origin/{0}', github.base_ref) || '' }}
+          ${{ github.event_name == 'push' && github.event.before != '0000000000000000000000000000000000000000' && format('--base-ref {0}', github.event.before) || '' }}
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: acceptance-report
+          path: |
+            acceptance/playwright-report
+            acceptance/reports
+            acceptance/test-results
+          retention-days: 14
+
+  dependency-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Audit app dependencies
+        run: bash acceptance/scripts/audit.sh
